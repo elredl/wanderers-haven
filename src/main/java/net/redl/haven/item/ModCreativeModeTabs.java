@@ -17,7 +17,8 @@ public class ModCreativeModeTabs {
             () -> CreativeModeTab.builder().icon(() -> new ItemStack(ModItems.SILVER.get()))
                     .title(Component.translatable("creativetab.haven_ingredients"))
                     .displayItems(((pParameters, pOutput) -> {
-                        // PAUSING HERE
+                        pOutput.accept(ModItems.SILVER.get());
+                        pOutput.accept(ModItems.RAW_SILVER.get());
                     }))
                     .build());
 

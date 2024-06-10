@@ -1,4 +1,6 @@
 {
   "item.haven.silver": "Silver Ingot",
-  "item.haven.raw_silver": "Raw Silver"
+  "item.haven.raw_silver": "Raw Silver",
+
+  "creativetab.haven_ingredients": "Wanderer's Haven Ingredients"
 }
