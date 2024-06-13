@@ -2,5 +2,8 @@
   "item.haven.silver": "Silver Ingot",
   "item.haven.raw_silver": "Raw Silver",
 
+  "block.haven.silver_block": "Block of Silver",
+  "block.haven.raw_silver_block": "Block of Raw Silver",
+
   "creativetab.haven_ingredients": "Wanderer's Haven Ingredients"
 }

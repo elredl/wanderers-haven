@@ -8,6 +8,7 @@ import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.RegistryObject;
 import net.redl.haven.HavenMain;
+import net.redl.haven.block.ModBlocks;
 
 public class ModCreativeModeTabs {
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS =
@@ -19,6 +20,8 @@ public class ModCreativeModeTabs {
                     .displayItems(((pParameters, pOutput) -> {
                         pOutput.accept(ModItems.SILVER.get());
                         pOutput.accept(ModItems.RAW_SILVER.get());
+                        pOutput.accept(ModBlocks.SILVER_BLOCK.get());
+                        pOutput.accept(ModBlocks.RAW_SILVER_BLOCK.get());
                     }))
                     .build());
 
