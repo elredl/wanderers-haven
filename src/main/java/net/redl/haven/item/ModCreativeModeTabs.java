@@ -18,10 +18,15 @@ public class ModCreativeModeTabs {
             () -> CreativeModeTab.builder().icon(() -> new ItemStack(ModItems.SILVER.get()))
                     .title(Component.translatable("creativetab.haven_ingredients"))
                     .displayItems(((pParameters, pOutput) -> {
+                        pOutput.accept(ModItems.STRAWBERRY.get());
                         pOutput.accept(ModItems.SILVER.get());
                         pOutput.accept(ModItems.RAW_SILVER.get());
                         pOutput.accept(ModBlocks.SILVER_BLOCK.get());
                         pOutput.accept(ModBlocks.RAW_SILVER_BLOCK.get());
+                        pOutput.accept(ModBlocks.DEEPSLATE_SILVER_ORE.get());
+                        pOutput.accept(ModBlocks.SILVER_ORE.get());
+                        pOutput.accept(ModItems.METAL_DETECTOR.get());
+                        pOutput.accept(ModBlocks.SOUND_BLOCK.get());
                     }))
                     .build());
 

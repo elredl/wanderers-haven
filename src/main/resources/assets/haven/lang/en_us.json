@@ -1,9 +1,15 @@
 {
   "item.haven.silver": "Silver Ingot",
   "item.haven.raw_silver": "Raw Silver",
+  "item.haven.metal_detector": "Metal Detector",
+  "item.haven.strawberry": "Strawberry",
 
   "block.haven.silver_block": "Block of Silver",
   "block.haven.raw_silver_block": "Block of Raw Silver",
+  "block.haven.silver_ore": "Silver Ore",
+  "block.haven.deepslate_silver_ore": "Deepslate Silver Ore",
+
+  "block.haven.sound_block": "Sound Block",
 
   "creativetab.haven_ingredients": "Wanderer's Haven Ingredients"
 }

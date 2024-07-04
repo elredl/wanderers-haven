@@ -12,6 +12,7 @@ import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 import net.redl.haven.HavenMain;
+import net.redl.haven.block.custom.SoundBlock;
 import net.redl.haven.item.ModItems;
 
 import java.util.function.Supplier;
@@ -32,14 +33,8 @@ public class ModBlocks {
     public static final RegistryObject<Block> DEEPSLATE_SILVER_ORE = registerBlock("deepslate_silver_ore",
             () -> new DropExperienceBlock(UniformInt.of(14, 140), BlockBehaviour.Properties.ofFullCopy(Blocks.DEEPSLATE)
                     .strength(2f).requiresCorrectToolForDrops()));
-    public static final RegistryObject<Block> NETHER_SILVER_ORE = registerBlock("nether_silver_ore",
-            () -> new DropExperienceBlock(UniformInt.of(14, 140), BlockBehaviour.Properties.ofFullCopy(Blocks.NETHERRACK)
-                    .strength(2f).requiresCorrectToolForDrops()));
-    public static final RegistryObject<Block> END_STONE_SILVER_ORE = registerBlock("end_stone_silver_ore",
-            () -> new DropExperienceBlock(UniformInt.of(14, 140), BlockBehaviour.Properties.ofFullCopy(Blocks.END_STONE)
-                    .strength(2f).requiresCorrectToolForDrops()));
-
-
+    public static final RegistryObject<Block> SOUND_BLOCK = registerBlock("sound_block",
+            () -> new SoundBlock(BlockBehaviour.Properties.ofFullCopy(Blocks.IRON_BLOCK)));
 
 
     private static <T extends Block> RegistryObject<T> registerBlock(String name, Supplier<T> block) {

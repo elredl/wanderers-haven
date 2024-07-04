@@ -1,0 +1,8 @@
+{
+  "variants" :
+  {
+    "": {
+      "model": "haven:block/deepslate_silver_ore"
+    }
+  }
+}
