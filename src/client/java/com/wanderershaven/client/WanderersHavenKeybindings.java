@@ -1,10 +1,11 @@
 package com.wanderershaven.client;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.minecraft.client.KeyMapping;
-import com.mojang.blaze3d.platform.InputConstants;
+import net.minecraft.resources.Identifier;
 
 /**
  * Registers and exposes all Wanderers Haven client keybindings.
@@ -12,7 +13,10 @@ import com.mojang.blaze3d.platform.InputConstants;
  */
 @Environment(EnvType.CLIENT)
 public final class WanderersHavenKeybindings {
-	public static final String CATEGORY = "key.categories.wanderers_haven";
+
+	/** Custom keybinding category shown in the controls screen. */
+	public static final KeyMapping.Category CATEGORY =
+		KeyMapping.Category.register(Identifier.fromNamespaceAndPath("wanderers_haven", "keycategory"));
 
 	/** Opens the radial active-skill menu while held. Default: Middle Mouse Button. */
 	public static KeyMapping radialMenu;

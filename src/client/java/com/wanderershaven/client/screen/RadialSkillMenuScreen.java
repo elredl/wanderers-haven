@@ -120,12 +120,12 @@ public class RadialSkillMenuScreen extends Screen {
 	// ── Input ─────────────────────────────────────────────────────────────────
 
 	@Override
-	public boolean mouseReleased(MouseButtonEvent event, boolean consumed) {
+	public boolean mouseReleased(MouseButtonEvent event) {
 		if (event.button() == 2) { // middle mouse released
 			activateHighlighted();
 			return true;
 		}
-		return super.mouseReleased(event, consumed);
+		return super.mouseReleased(event);
 	}
 
 	@Override
