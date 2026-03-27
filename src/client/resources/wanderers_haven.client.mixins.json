@@ -1,0 +1,11 @@
+{
+	"required": true,
+	"package": "com.wanderershaven.mixin.client",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"WanderersHavenClientMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

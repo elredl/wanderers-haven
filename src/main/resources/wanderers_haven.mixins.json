@@ -1,0 +1,16 @@
+{
+	"required": true,
+	"package": "com.wanderershaven.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"mixins": [
+		"WanderersHavenMixin",
+		"LivingEntitySkillMixin",
+		"PlayerSkillMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

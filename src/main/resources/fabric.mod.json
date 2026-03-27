@@ -1,0 +1,41 @@
+{
+	"schemaVersion": 1,
+	"id": "wanderers_haven",
+	"version": "${version}",
+	"name": "Wanderers Haven",
+	"description": "A Fabric mod scaffold for Wanderers Haven.",
+	"authors": [
+		"Wanderers Haven Team"
+	],
+	"contact": {
+		"homepage": "https://fabricmc.net/"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/wanderers_haven/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.wanderershaven.WanderersHavenMod"
+		],
+		"client": [
+			"com.wanderershaven.WanderersHavenModClient"
+		]
+	},
+	"mixins": [
+		"wanderers_haven.mixins.json",
+		{
+			"config": "wanderers_haven.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.18.3",
+		"minecraft": "~1.21.11",
+		"java": ">=21",
+		"fabric-api": "*"
+	},
+	"suggests": {
+		"bettercombat": ">=3.0.1",
+		"simplyswords": "*"
+	}
+}
