@@ -127,6 +127,9 @@ public class SkillManagementScreen extends Screen {
 		// Footer
 		g.drawCenteredString(font, DIVIDER, cx, height / 2 + 86, C_DIVIDER);
 
+		// Tooltip — show description of hovered skill
+		renderHoveredSkillTooltip(g, mx, my);
+
 		super.render(g, mx, my, delta);
 	}
 
@@ -273,6 +276,24 @@ public class SkillManagementScreen extends Screen {
 			text = text.substring(0, text.length() - 1);
 		}
 		return text + "...";
+	}
+
+	private void renderHoveredSkillTooltip(GuiGraphics g, int mx, int my) {
+		if (!(mx >= listX && mx < listX + listW)) return;
+		int row = (my - listY) / LIST_ROW_H;
+		int idx = scrollOffset + row;
+		if (row < 0 || idx >= skills.size()) return;
+		int ry = listY + row * LIST_ROW_H;
+		if (my < ry || my >= ry + LIST_ROW_H) return;
+
+		OpenSkillManagementPayload.SkillEntry skill = skills.get(idx);
+		List<Component> tooltip = List.of(
+			Component.literal(skill.displayName()).withStyle(s -> s.withColor(0xFFD700)),
+			Component.literal("Power Level " + skill.powerLevel()).withStyle(s -> s.withColor(0xAAAAAA)),
+			Component.literal(""),
+			Component.literal(skill.description()).withStyle(s -> s.withColor(0xFFFFFF))
+		);
+		g.setComponentTooltipForNextFrame(font, tooltip, mx, my);
 	}
 
 	private static void drawBorder(GuiGraphics g, int x, int y, int w, int h, int color) {

@@ -15,57 +15,61 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 
 public class WanderersHavenModClient implements ClientModInitializer {
 
-	/** Whether the radial-menu key was pressed on the previous tick. */
-	private boolean radialWasDown = false;
+	/**
+	 * Payload received from the server but not yet shown because another screen was open.
+	 * Opened as soon as no other screen is active (e.g. after ClassSelectionScreen closes).
+	 */
+	public static volatile OpenSkillManagementPayload pendingSkillManagement = null;
 
 	@Override
 	public void onInitializeClient() {
-		// Register keybindings
 		WanderersHavenKeybindings.register();
 
-		// Open the class-selection screen when the server sends pending classes
+		// Class-selection screen (pending class decisions)
 		ClientPlayNetworking.registerGlobalReceiver(OpenClassSelectionPayload.TYPE, (payload, context) ->
 			context.client().execute(() ->
 				context.client().setScreen(new ClassSelectionScreen(payload.pendingClasses()))
 			)
 		);
 
-		// Update the local skill state when the server syncs skill ownership
+		// Skill ownership sync
 		ClientPlayNetworking.registerGlobalReceiver(SyncPlayerSkillsPayload.TYPE, (payload, context) ->
 			context.client().execute(() ->
 				ClientSkillState.update(payload.skillIds())
 			)
 		);
 
-		// Open the Skill Management screen when the server signals it (triggered by sleeping)
+		// Skill management screen — always store; open immediately if no screen is active,
+		// otherwise queue so it appears after ClassSelectionScreen (or anything else) closes.
 		ClientPlayNetworking.registerGlobalReceiver(OpenSkillManagementPayload.TYPE, (payload, context) ->
 			context.client().execute(() -> {
-				// Only open if no screen is already active (e.g. class selection takes priority)
+				ClientSkillState.updateSlots(payload.slots());
 				if (context.client().screen == null) {
-					ClientSkillState.updateSlots(payload.slots());
-					context.client().setScreen(
-						new SkillManagementScreen(payload.ownedSkills(), payload.slots())
-					);
+					context.client().setScreen(new SkillManagementScreen(payload.ownedSkills(), payload.slots()));
+				} else {
+					pendingSkillManagement = payload;
 				}
 			})
 		);
 
-		// Radial menu — open on key press, close (and fire) on release
+		// Tick handler:
+		//   1. Radial menu — open when the key is freshly pressed (consumeClick fires once per press).
+		//      The screen itself detects when the button is released (via GLFW) and closes itself.
+		//   2. Queued skill management — open once no screen is active.
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
-			boolean isDown = WanderersHavenKeybindings.radialMenu.isDown();
-
-			if (isDown && !radialWasDown && client.screen == null) {
-				// Key just pressed — open the radial menu
+			// Radial menu
+			if (WanderersHavenKeybindings.radialMenu.consumeClick() && client.screen == null) {
 				client.execute(() -> client.setScreen(new RadialSkillMenuScreen()));
-			} else if (!isDown && radialWasDown && client.screen instanceof RadialSkillMenuScreen radial) {
-				// Key just released while radial is open — fire and close
-				client.execute(radial::onRadialKeyReleased);
 			}
 
-			radialWasDown = isDown;
+			// Deferred skill management screen
+			if (pendingSkillManagement != null && client.screen == null) {
+				OpenSkillManagementPayload p = pendingSkillManagement;
+				pendingSkillManagement = null;
+				client.execute(() -> client.setScreen(new SkillManagementScreen(p.ownedSkills(), p.slots())));
+			}
 		});
 
-		// Register Dangersense HUD overlay
 		DangersenseHud.register();
 	}
 }

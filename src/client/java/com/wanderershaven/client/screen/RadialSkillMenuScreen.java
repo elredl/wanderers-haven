@@ -3,10 +3,12 @@ package com.wanderershaven.client.screen;
 import com.wanderershaven.client.ClientSkillState;
 import com.wanderershaven.network.UseActiveSkillPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
+import org.lwjgl.glfw.GLFW;
 
 /**
  * Radial active-skill menu, shown while the player holds the radial-menu key
@@ -48,6 +50,12 @@ public class RadialSkillMenuScreen extends Screen {
 
 	/** Cached screen centre (set in init). */
 	private int cx, cy;
+
+	/**
+	 * Skip the first tick after opening. Prevents a spurious close if MC clears
+	 * the key-down state when the screen is constructed.
+	 */
+	private boolean firstTick = true;
 
 	public RadialSkillMenuScreen() {
 		super(Component.empty());
@@ -118,6 +126,22 @@ public class RadialSkillMenuScreen extends Screen {
 	}
 
 	// ── Input ─────────────────────────────────────────────────────────────────
+
+	/**
+	 * Poll the actual GLFW hardware state every tick. This is more reliable than
+	 * KeyMapping.isDown(), which MC may reset when a screen is opened.
+	 */
+	@Override
+	public void tick() {
+		if (firstTick) {
+			firstTick = false;
+			return;
+		}
+		long window = Minecraft.getInstance().getWindow().handle();
+		if (GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_MIDDLE) == GLFW.GLFW_RELEASE) {
+			activateHighlighted();
+		}
+	}
 
 	@Override
 	public boolean mouseReleased(MouseButtonEvent event) {

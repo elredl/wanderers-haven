@@ -16,6 +16,7 @@ import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
 import net.minecraft.core.Holder;
 
@@ -78,17 +79,9 @@ public final class SkillEffectService {
 		});
 
 		// Second Wind + Last Stand — trigger when health crosses below 40 %
-		// Iron Skin — heal back 10 % of arrow damage
 		ServerLivingEntityEvents.AFTER_DAMAGE.register(
 			(entity, source, baseDamage, actualDamage, blocked) -> {
 				if (!(entity instanceof ServerPlayer player)) return;
-				// Iron Skin arrow reduction (heal-back approach)
-				if (source.getDirectEntity() instanceof AbstractArrow) {
-					Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
-					if (skills.contains("warrior_iron_skin") && actualDamage > 0) {
-						player.heal(actualDamage * 0.10f);
-					}
-				}
 				float ratio = player.getHealth() / player.getMaxHealth();
 				if (ratio < 0.4f) {
 					trySecondWind(player);
@@ -169,12 +162,25 @@ public final class SkillEffectService {
 	 * Incoming damage multiplier from damage-reduction skills.
 	 * Stacks multiplicatively: ToughSkin(×0.95) × LesserEndurance(×0.90) = 14.5 % total.
 	 */
-	public static float getDamageMultiplier(ServerPlayer player) {
+	/**
+	 * Returns a damage multiplier for the player given the incoming source.
+	 * Pass {@code null} for source when the source is unavailable (legacy call sites).
+	 *
+	 * Arrow reduction for Iron Skin mirrors the Projectile Protection enchantment:
+	 * damage is reduced before it is applied, not healed back afterwards.
+	 */
+	public static float getDamageMultiplier(ServerPlayer player, DamageSource source) {
 		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
 		float mult = 1.0f;
 		// Iron Skin supersedes Tough Skin — only one can be owned at a time
 		if      (skills.contains("warrior_iron_skin"))         mult *= 0.88f;
 		else if (skills.contains("warrior_tough_skin"))        mult *= 0.95f;
+		// Arrow-specific reduction for Iron Skin (pre-application, same as Projectile Protection)
+		if (source != null
+				&& source.getDirectEntity() instanceof AbstractArrow
+				&& skills.contains("warrior_iron_skin")) {
+			mult *= 0.90f;
+		}
 		// Enhanced Endurance supersedes Lesser Endurance
 		if      (skills.contains("warrior_enhanced_endurance")) mult *= 0.82f;
 		else if (skills.contains("warrior_lesser_endurance"))   mult *= 0.90f;

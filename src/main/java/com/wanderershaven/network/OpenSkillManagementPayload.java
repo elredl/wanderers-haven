@@ -26,6 +26,7 @@ public record OpenSkillManagementPayload(
 				buf.writeUtf(e.id());
 				buf.writeUtf(e.displayName());
 				buf.writeVarInt(e.powerLevel());
+				buf.writeUtf(e.description());
 			}
 			for (String slot : payload.slots()) {
 				buf.writeUtf(slot == null ? "" : slot);
@@ -35,7 +36,7 @@ public record OpenSkillManagementPayload(
 			int count = buf.readVarInt();
 			List<SkillEntry> skills = new ArrayList<>(count);
 			for (int i = 0; i < count; i++) {
-				skills.add(new SkillEntry(buf.readUtf(), buf.readUtf(), buf.readVarInt()));
+				skills.add(new SkillEntry(buf.readUtf(), buf.readUtf(), buf.readVarInt(), buf.readUtf()));
 			}
 			List<String> slots = new ArrayList<>(5);
 			for (int i = 0; i < 5; i++) {
@@ -52,5 +53,5 @@ public record OpenSkillManagementPayload(
 	}
 
 	/** A skill entry suitable for rendering in the Skill Management screen. */
-	public record SkillEntry(String id, String displayName, int powerLevel) {}
+	public record SkillEntry(String id, String displayName, int powerLevel, String description) {}
 }

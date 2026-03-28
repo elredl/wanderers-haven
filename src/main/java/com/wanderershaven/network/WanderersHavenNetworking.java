@@ -93,10 +93,9 @@ public final class WanderersHavenNetworking {
 				UUID uuid = player.getUUID();
 				if (player.isSleeping()) {
 					if (sleepingPlayers.add(uuid)) {
-						// Only show one screen — class decisions take priority
-						if (!sendPendingClassesTo(player)) {
-							sendOpenSkillManagement(player);
-						}
+						// Always show skill management; class decisions open on top if present
+						sendOpenSkillManagement(player);
+						sendPendingClassesTo(player);
 					}
 				} else {
 					sleepingPlayers.remove(uuid);
@@ -154,7 +153,7 @@ public final class WanderersHavenNetworking {
 				.flatMap(classId -> ClassSystemBootstrap.skillEngine()
 					.ownedSkills(player.getUUID(), classId).stream())
 				.map(def -> new OpenSkillManagementPayload.SkillEntry(
-					def.id(), def.displayName(), def.powerLevel()))
+					def.id(), def.displayName(), def.powerLevel(), def.description()))
 				.collect(Collectors.toList());
 
 		// Current slot bindings
