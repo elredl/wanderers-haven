@@ -2,6 +2,7 @@ package com.wanderershaven.classsystem;
 
 import com.wanderershaven.classsystem.evolution.ClassEvolutionDef;
 import com.wanderershaven.classsystem.evolution.ClassEvolutionEngine;
+import com.wanderershaven.network.WanderersHavenNetworking;
 import com.wanderershaven.compat.BetterCombatCompat;
 import com.wanderershaven.compat.WeaponCategoryResolver;
 import com.wanderershaven.levelup.ClassLevelEngine;
@@ -324,11 +325,7 @@ public final class ClassEventIngestionService {
 				);
 				if (!offers.isEmpty()) {
 					evolutionEngine.setPendingOffer(player.getUUID(), offers);
-					player.sendSystemMessage(Component.literal(
-						"[Wanderers Haven] Your " + event.classId() + " has reached a milestone! "
-							+ "Choose your evolution path: "
-							+ offers.stream().map(ClassEvolutionDef::displayName).reduce((a, b) -> a + ", " + b).orElse("")
-					));
+					WanderersHavenNetworking.sendEvolutionSelection(player, event.classId(), offers);
 				}
 			}
 		}

@@ -3,6 +3,7 @@ package com.wanderershaven.network;
 import com.wanderershaven.classsystem.ClassDefinition;
 import com.wanderershaven.classsystem.ClassInferenceEngine;
 import com.wanderershaven.classsystem.ClassSystemBootstrap;
+import com.wanderershaven.classsystem.evolution.ClassEvolutionDef;
 import com.wanderershaven.skill.ActiveSkillSlots;
 import com.wanderershaven.skill.SkillDefinition;
 import java.util.ArrayList;
@@ -27,9 +28,11 @@ public final class WanderersHavenNetworking {
 		PayloadTypeRegistry.playS2C().register(OpenClassSelectionPayload.TYPE, OpenClassSelectionPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(SyncPlayerSkillsPayload.TYPE, SyncPlayerSkillsPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(OpenSkillManagementPayload.TYPE, OpenSkillManagementPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(OpenEvolutionSelectionPayload.TYPE, OpenEvolutionSelectionPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(ClassDecisionPayload.TYPE, ClassDecisionPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(UpdateActiveSkillSlotsPayload.TYPE, UpdateActiveSkillSlotsPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(UseActiveSkillPayload.TYPE, UseActiveSkillPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(EvolutionChoicePayload.TYPE, EvolutionChoicePayload.CODEC);
 	}
 
 	/** Register all C2S handlers that run on the server. */
@@ -67,6 +70,19 @@ public final class WanderersHavenNetworking {
 			});
 		});
 
+		// Evolution choice — player selected an evolution path
+		ServerPlayNetworking.registerGlobalReceiver(EvolutionChoicePayload.TYPE, (payload, context) -> {
+			context.server().execute(() -> {
+				ServerPlayer player = context.player();
+				boolean accepted = ClassSystemBootstrap.evolutionEngine().acceptEvolution(player.getUUID(), payload.evolutionId());
+				if (accepted) {
+					player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+						"[Wanderers Haven] Evolution locked in: " + payload.evolutionId()
+					));
+				}
+			});
+		});
+
 		// Active skill use — player activated a slot from the radial menu
 		ServerPlayNetworking.registerGlobalReceiver(UseActiveSkillPayload.TYPE, (payload, context) -> {
 			context.server().execute(() -> {
@@ -96,6 +112,8 @@ public final class WanderersHavenNetworking {
 						// Always show skill management; class decisions open on top if present
 						sendOpenSkillManagement(player);
 						sendPendingClassesTo(player);
+						// Re-send any unresolved evolution offer (player may have missed it)
+						sendPendingEvolutionTo(player);
 					}
 				} else {
 					sleepingPlayers.remove(uuid);
@@ -143,6 +161,27 @@ public final class WanderersHavenNetworking {
 			return true;
 		}
 		return false;
+	}
+
+	/**
+	 * If the player has a pending evolution offer that they haven't resolved yet,
+	 * re-send the selection screen. Called on sleep so players never permanently miss it.
+	 */
+	public static void sendPendingEvolutionTo(ServerPlayer player) {
+		List<ClassEvolutionDef> pending = ClassSystemBootstrap.evolutionEngine().getPendingOffer(player.getUUID());
+		if (pending.isEmpty()) return;
+		// Derive base class from the first offer (all entries share the same base class)
+		String baseClassId = pending.get(0).baseClassId();
+		sendEvolutionSelection(player, baseClassId, pending);
+	}
+
+	/** Build and send the OpenEvolutionSelectionPayload to the given player. */
+	public static void sendEvolutionSelection(ServerPlayer player, String baseClassId, List<ClassEvolutionDef> offers) {
+		List<OpenEvolutionSelectionPayload.EvolutionEntry> entries = offers.stream()
+			.map(def -> new OpenEvolutionSelectionPayload.EvolutionEntry(
+				def.id(), def.displayName(), def.description()))
+			.collect(Collectors.toList());
+		ServerPlayNetworking.send(player, new OpenEvolutionSelectionPayload(baseClassId, entries));
 	}
 
 	/** Build and send the OpenSkillManagementPayload to the given player. */
