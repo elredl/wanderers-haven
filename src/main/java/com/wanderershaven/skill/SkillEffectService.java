@@ -22,6 +22,7 @@ import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
@@ -427,7 +428,7 @@ public final class SkillEffectService {
 		List<LivingEntity> nearby = player.level().getEntitiesOfClass(
 			LivingEntity.class,
 			player.getBoundingBox().inflate(3.5),
-			e -> e != player && (e instanceof Monster || (e instanceof Player && e != player))
+			e -> e != player && (e instanceof Enemy || (e instanceof Player && e != player))
 		);
 		if (nearby.isEmpty()) {
 			player.sendSystemMessage(Component.literal(
