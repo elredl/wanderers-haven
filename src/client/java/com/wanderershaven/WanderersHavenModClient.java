@@ -2,14 +2,15 @@ package com.wanderershaven;
 
 import com.wanderershaven.client.ClientSkillState;
 import com.wanderershaven.client.WanderersHavenKeybindings;
+import com.wanderershaven.client.animation.SkillAnimationHandler;
 import com.wanderershaven.client.hud.DangersenseHud;
 import com.wanderershaven.client.screen.ClassSelectionScreen;
-import com.wanderershaven.client.screen.EvolutionSelectionScreen;
 import com.wanderershaven.client.screen.RadialSkillMenuScreen;
 import com.wanderershaven.client.screen.SkillManagementScreen;
 import com.wanderershaven.network.OpenClassSelectionPayload;
 import com.wanderershaven.network.OpenEvolutionSelectionPayload;
 import com.wanderershaven.network.OpenSkillManagementPayload;
+import com.wanderershaven.network.PlaySkillAnimationPayload;
 import com.wanderershaven.network.SyncPlayerSkillsPayload;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -51,22 +52,27 @@ public class WanderersHavenModClient implements ClientModInitializer {
 
 		// Skill management screen — always store; open immediately if no screen is active,
 		// otherwise queue so it appears after ClassSelectionScreen (or anything else) closes.
+		// Evolution data (if any) is bundled inside the payload.
 		ClientPlayNetworking.registerGlobalReceiver(OpenSkillManagementPayload.TYPE, (payload, context) ->
 			context.client().execute(() -> {
 				ClientSkillState.updateSlots(payload.slots());
 				if (context.client().screen == null) {
-					context.client().setScreen(new SkillManagementScreen(payload.ownedSkills(), payload.slots()));
+					context.client().setScreen(new SkillManagementScreen(
+						payload.ownedSkills(), payload.slots(),
+						payload.evolutionBaseClassId(), payload.evolutionOffers(),
+						payload.notifications()));
 				} else {
 					pendingSkillManagement = payload;
 				}
 			})
 		);
 
-		// Evolution selection screen
-		ClientPlayNetworking.registerGlobalReceiver(OpenEvolutionSelectionPayload.TYPE, (payload, context) ->
-			context.client().execute(() ->
-				context.client().setScreen(new EvolutionSelectionScreen(payload.baseClassId(), payload.offers()))
-			)
+		// Evolution is now handled inside SkillManagementScreen — this payload is no longer sent.
+		ClientPlayNetworking.registerGlobalReceiver(OpenEvolutionSelectionPayload.TYPE, (payload, context) -> {});
+
+		// Active skill animations — arm swing placeholder; replace with GeckoLib calls in SkillAnimationHandler
+		ClientPlayNetworking.registerGlobalReceiver(PlaySkillAnimationPayload.TYPE, (payload, context) ->
+			context.client().execute(() -> SkillAnimationHandler.play(payload.skillId()))
 		);
 
 		// Tick handler:
@@ -86,7 +92,10 @@ public class WanderersHavenModClient implements ClientModInitializer {
 			if (pendingSkillManagement != null && client.screen == null) {
 				OpenSkillManagementPayload p = pendingSkillManagement;
 				pendingSkillManagement = null;
-				client.execute(() -> client.setScreen(new SkillManagementScreen(p.ownedSkills(), p.slots())));
+				client.execute(() -> client.setScreen(new SkillManagementScreen(
+					p.ownedSkills(), p.slots(),
+					p.evolutionBaseClassId(), p.evolutionOffers(),
+					p.notifications())));
 			}
 		});
 

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep:*)",
+      "WebFetch(domain:dl.cloudsmith.io)",
+      "Bash(./gradlew dependencies:*)",
+      "Bash(curl -sI \"https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/software/bernie/geckolib/geckolib-fabric-1.21.1/4.8.4/geckolib-fabric-1.21.1-4.8.4.jar\")",
+      "Bash(./gradlew runClient)"
+    ]
+  }
+}

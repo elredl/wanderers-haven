@@ -67,6 +67,10 @@ public final class ClassSystemBootstrap {
 		return EVOLUTION_ENGINE;
 	}
 
+	public static ClassEventIngestionService ingestionService() {
+		return INGESTION_SERVICE;
+	}
+
 	public static ActiveSkillSlots activeSkillSlots() {
 		return ACTIVE_SKILL_SLOTS;
 	}

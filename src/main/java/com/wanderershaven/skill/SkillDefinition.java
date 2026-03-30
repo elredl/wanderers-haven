@@ -22,5 +22,7 @@ public record SkillDefinition(
 	int powerLevel,
 	String displayName,
 	String description,
-	String supersedesId
+	String supersedesId,
+	/** True if this skill must be manually activated (placeable in the skill wheel). */
+	boolean active
 ) {}

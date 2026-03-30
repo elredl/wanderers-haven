@@ -66,6 +66,22 @@ public final class WarriorSkills {
 				"Slow Metabolism",
 				"Years of campaign rations have trained your body to make do with less. Hunger depletes 10% slower."),
 
+			activeSkill("warrior_heavy_strikes", 1,
+				"Heavy Strikes",
+				"You channel your strength into every blow. Activate to deal 12% more damage for 10 seconds. (30 sec cooldown)"),
+
+			activeSkill("warrior_battle_cry_weak", 1,
+				"Battle Cry (Weak)",
+				"Your war cry rattles the nerves of nearby enemies. Activate to weaken all hostile mobs and players within 8 blocks: they deal 8% less damage and take 8% more damage for 8 seconds. (45 sec cooldown)"),
+
+			activeSkill("warrior_bludgeon", 1,
+				"Bludgeon",
+				"A brutal strike that catches enemies off-guard. Activate to deal weapon damage to all enemies in a cone in front of you, reducing their armor by 15% for 5 seconds. (15 sec cooldown)"),
+
+			activeSkill("warrior_piercing_charge", 1,
+				"Piercing Charge",
+				"You hurl yourself forward like a battering ram. Activate to dash 5 blocks in the direction you are facing, dealing 130% weapon damage to all enemies in your path. (20 sec cooldown)"),
+
 			// -----------------------------------------------------------------
 			// PW2 -- Small improvements that start shaping a playstyle.
 			// -----------------------------------------------------------------
@@ -244,10 +260,14 @@ public final class WarriorSkills {
 	}
 
 	private static SkillDefinition skill(String id, int powerLevel, String displayName, String description) {
-		return new SkillDefinition(id, CLASS, powerLevel, displayName, description, null);
+		return new SkillDefinition(id, CLASS, powerLevel, displayName, description, null, false);
+	}
+
+	private static SkillDefinition activeSkill(String id, int powerLevel, String displayName, String description) {
+		return new SkillDefinition(id, CLASS, powerLevel, displayName, description, null, true);
 	}
 
 	private static SkillDefinition upgrade(String id, int powerLevel, String displayName, String description, String supersedesId) {
-		return new SkillDefinition(id, CLASS, powerLevel, displayName, description, supersedesId);
+		return new SkillDefinition(id, CLASS, powerLevel, displayName, description, supersedesId, false);
 	}
 }

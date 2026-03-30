@@ -6,6 +6,7 @@ import com.wanderershaven.classsystem.ClassSystemBootstrap;
 import com.wanderershaven.classsystem.evolution.ClassEvolutionDef;
 import com.wanderershaven.skill.ActiveSkillSlots;
 import com.wanderershaven.skill.SkillDefinition;
+import com.wanderershaven.skill.SkillEffectService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +30,7 @@ public final class WanderersHavenNetworking {
 		PayloadTypeRegistry.playS2C().register(SyncPlayerSkillsPayload.TYPE, SyncPlayerSkillsPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(OpenSkillManagementPayload.TYPE, OpenSkillManagementPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(OpenEvolutionSelectionPayload.TYPE, OpenEvolutionSelectionPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(PlaySkillAnimationPayload.TYPE, PlaySkillAnimationPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(ClassDecisionPayload.TYPE, ClassDecisionPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(UpdateActiveSkillSlotsPayload.TYPE, UpdateActiveSkillSlotsPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(UseActiveSkillPayload.TYPE, UseActiveSkillPayload.CODEC);
@@ -109,11 +111,9 @@ public final class WanderersHavenNetworking {
 				UUID uuid = player.getUUID();
 				if (player.isSleeping()) {
 					if (sleepingPlayers.add(uuid)) {
-						// Always show skill management; class decisions open on top if present
+						// Always show skill management (with evolution bundled); class decisions open on top if present
 						sendOpenSkillManagement(player);
 						sendPendingClassesTo(player);
-						// Re-send any unresolved evolution offer (player may have missed it)
-						sendPendingEvolutionTo(player);
 					}
 				} else {
 					sleepingPlayers.remove(uuid);
@@ -121,10 +121,11 @@ public final class WanderersHavenNetworking {
 			}
 		});
 
-		// Clean up slot data when a player disconnects
-		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
-			ClassSystemBootstrap.activeSkillSlots().remove(handler.player.getUUID())
-		);
+		// Clean up slot data and queued notifications when a player disconnects
+		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+			ClassSystemBootstrap.activeSkillSlots().remove(handler.player.getUUID());
+			PlayerNotificationStore.clear(handler.player.getUUID());
+		});
 	}
 
 	/** Collect all owned skill IDs across every class and send them to the player's client. */
@@ -184,15 +185,19 @@ public final class WanderersHavenNetworking {
 		ServerPlayNetworking.send(player, new OpenEvolutionSelectionPayload(baseClassId, entries));
 	}
 
-	/** Build and send the OpenSkillManagementPayload to the given player. */
+	/** Build and send the OpenSkillManagementPayload to the given player, bundling any pending evolution. */
 	public static void sendOpenSkillManagement(ServerPlayer player) {
-		// Collect all owned skill definitions
+		// Process any deferred level-ups: roll skills, apply effects, queue notifications,
+		// set evolution offers. Must happen before reading owned skills or notifications below.
+		ClassSystemBootstrap.ingestionService().processQueuedLevelUps(player);
+
+		// Collect all owned skill definitions, preserving the active flag
 		List<OpenSkillManagementPayload.SkillEntry> skillEntries =
 			ClassSystemBootstrap.engine().registeredClasses().keySet().stream()
 				.flatMap(classId -> ClassSystemBootstrap.skillEngine()
 					.ownedSkills(player.getUUID(), classId).stream())
 				.map(def -> new OpenSkillManagementPayload.SkillEntry(
-					def.id(), def.displayName(), def.powerLevel(), def.description()))
+					def.id(), def.displayName(), def.powerLevel(), def.description(), def.active()))
 				.collect(Collectors.toList());
 
 		// Current slot bindings
@@ -200,7 +205,21 @@ public final class WanderersHavenNetworking {
 		List<String> slotList = new ArrayList<>(5);
 		for (String s : arr) slotList.add(s);
 
-		ServerPlayNetworking.send(player, new OpenSkillManagementPayload(skillEntries, slotList));
+		// Bundle any pending evolution offer
+		List<ClassEvolutionDef> pendingEvo = ClassSystemBootstrap.evolutionEngine().getPendingOffer(player.getUUID());
+		String evoBaseClass = "";
+		List<OpenSkillManagementPayload.EvolutionEntry> evoOffers = List.of();
+		if (!pendingEvo.isEmpty()) {
+			evoBaseClass = pendingEvo.get(0).baseClassId();
+			evoOffers = pendingEvo.stream()
+				.map(def -> new OpenSkillManagementPayload.EvolutionEntry(def.id(), def.displayName(), def.description()))
+				.collect(Collectors.toList());
+		}
+
+		// Drain queued notifications (level-ups + skill grants since last GUI open)
+		List<String> notifications = PlayerNotificationStore.drain(player.getUUID());
+
+		ServerPlayNetworking.send(player, new OpenSkillManagementPayload(skillEntries, slotList, evoBaseClass, evoOffers, notifications));
 	}
 
 	// -------------------------------------------------------------------------
@@ -209,11 +228,14 @@ public final class WanderersHavenNetworking {
 
 	/**
 	 * Execute an active skill for the given player.
-	 * Skill-specific logic will be added here as active skills are designed.
 	 */
 	private static void executeActiveSkill(ServerPlayer player, String skillId) {
-		// TODO: dispatch to SkillEffectService or skill-specific handlers once
-		// active skills are designed. Infrastructure is in place; effects TBD.
+		switch (skillId) {
+			case "warrior_heavy_strikes"   -> SkillEffectService.executeHeavyStrikes(player);
+			case "warrior_battle_cry_weak" -> SkillEffectService.executeBattleCryWeak(player);
+			case "warrior_bludgeon"        -> SkillEffectService.executeBludgeon(player);
+			case "warrior_piercing_charge" -> SkillEffectService.executePiercingCharge(player);
+		}
 	}
 
 	// -------------------------------------------------------------------------

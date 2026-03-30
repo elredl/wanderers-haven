@@ -2,11 +2,12 @@ package com.wanderershaven.classsystem;
 
 import com.wanderershaven.classsystem.evolution.ClassEvolutionDef;
 import com.wanderershaven.classsystem.evolution.ClassEvolutionEngine;
-import com.wanderershaven.network.WanderersHavenNetworking;
+import com.wanderershaven.network.PlayerNotificationStore;
 import com.wanderershaven.compat.BetterCombatCompat;
 import com.wanderershaven.compat.WeaponCategoryResolver;
 import com.wanderershaven.levelup.ClassLevelEngine;
 import com.wanderershaven.levelup.LevelUpEvent;
+import com.wanderershaven.skill.SkillDefinition;
 import com.wanderershaven.skill.SkillEffectService;
 import com.wanderershaven.skill.SkillGrantResult;
 import com.wanderershaven.skill.SkillRollEngine;
@@ -41,7 +42,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.npc.villager.Villager;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
-import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemUseAnimation;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.phys.AABB;
@@ -288,33 +288,35 @@ public final class ClassEventIngestionService {
 		return serverPlayer;
 	}
 
-	private void ingest(ServerPlayer player, ClassSignalType type, double weight, Map<String, String> context) {
-		String worldKey = player.level().dimension().identifier().toString();
-		long gameTime = player.level().getDayTime();
-		ClassSignal signal = new ClassSignal(player.getUUID(), type, weight, gameTime, worldKey, context);
-
-		inferenceEngine.ingest(signal);
-		levelEngine.observe(signal);
-		evolutionEngine.processSignal(signal);
-
+	/**
+	 * Process all deferred level-up events for a player: roll skills, apply attribute
+	 * effects, queue GUI notifications, and set any pending evolution offers.
+	 *
+	 * Called from {@code WanderersHavenNetworking.sendOpenSkillManagement} just before
+	 * building the payload, so every opened GUI shows the latest state.
+	 */
+	public void processQueuedLevelUps(ServerPlayer player) {
 		List<LevelUpEvent> levelUps = levelEngine.drainLevelUpEvents(player.getUUID());
 		for (LevelUpEvent event : levelUps) {
-			player.sendSystemMessage(Component.literal(
-				"[Wanderers Haven] You reached Level " + event.newLevel() + " in [" + event.classId() + "]!"
-			));
+			String classDisplayName = getClassDisplayName(event.classId());
+			PlayerNotificationStore.recordLevelUp(
+				player.getUUID(), event.classId(), classDisplayName, event.newLevel());
 
 			skillEngine.tryRollSkill(player.getUUID(), event.classId(), event.newLevel())
 				.ifPresent(result -> {
 					SkillEffectService.applySkill(player, result.granted().id());
-					String header = result.isUpgrade()
-						? "[Wanderers Haven] Skill upgraded: "
-						: "[Wanderers Haven] Skill unlocked: ";
-					player.sendSystemMessage(Component.literal(
-						header + "[" + result.granted().displayName() + "] (PW" + result.granted().powerLevel() + ") \u2014 " + result.granted().description()
-					));
+					if (result.isUpgrade()) {
+						String oldName = skillEngine.findById(result.supersededId())
+							.map(SkillDefinition::displayName)
+							.orElse(result.supersededId());
+						PlayerNotificationStore.recordSkillChange(
+							player.getUUID(), oldName, result.granted().displayName());
+					} else {
+						PlayerNotificationStore.recordSkillGrant(
+							player.getUUID(), result.granted().displayName());
+					}
 				});
 
-			// Every 25 levels, evaluate and present evolution choices.
 			if (event.newLevel() % 25 == 0) {
 				Set<String> ownedClassIds = inferenceEngine.profile(player.getUUID())
 					.map(PlayerClassProfile::obtainedClasses)
@@ -325,10 +327,27 @@ public final class ClassEventIngestionService {
 				);
 				if (!offers.isEmpty()) {
 					evolutionEngine.setPendingOffer(player.getUUID(), offers);
-					WanderersHavenNetworking.sendEvolutionSelection(player, event.classId(), offers);
+					// Evolution is bundled into the OpenSkillManagementPayload — no separate packet needed.
 				}
 			}
 		}
+	}
+
+	private String getClassDisplayName(String classId) {
+		ClassDefinition def = inferenceEngine.registeredClasses().get(classId);
+		return def != null ? def.displayName() : classId;
+	}
+
+	private void ingest(ServerPlayer player, ClassSignalType type, double weight, Map<String, String> context) {
+		String worldKey = player.level().dimension().identifier().toString();
+		long gameTime = player.level().getDayTime();
+		ClassSignal signal = new ClassSignal(player.getUUID(), type, weight, gameTime, worldKey, context);
+
+		inferenceEngine.ingest(signal);
+		levelEngine.observe(signal);
+		evolutionEngine.processSignal(signal);
+		// Level-up processing (skill rolls, notifications) is deferred to processQueuedLevelUps(),
+		// which runs when the player opens the GUI via sleep or /wh gui.
 	}
 
 	private boolean readyForSignal(PlayerObservation observation, ClassSignalType signalType, long gameTime, long cooldown) {

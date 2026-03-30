@@ -14,6 +14,7 @@ repositories {
 	maven { url "https://api.modrinth.com/maven" }
 	maven { url "https://maven.shedaniel.me/" }
 	maven { url "https://maven.terraformersmc.com/releases" }
+	maven { url "https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/" }
 }
 
 loom {
@@ -54,6 +55,11 @@ dependencies {
 	modRuntimeOnly "maven.modrinth:player-animation-library:1.1.6"
 	// tiny-config is bundled inside BetterCombat as a JAR-in-JAR but needs to be explicit in dev
 	modRuntimeOnly fileTree(dir: 'libs', include: '*.jar')
+
+	// GeckoLib — uncomment when a version compatible with MC 1.21.11 is available.
+	// geckolib-fabric-1.21.1:4.8.4 crashes on 1.21.11 due to mixin incompatibility.
+	// Animation scaffold is in SkillAnimationHandler; swap player.swing() for GeckoLib calls when ready.
+	// modImplementation "software.bernie.geckolib:geckolib-fabric-1.21.1:4.8.4"
 }
 
 processResources {

@@ -10,6 +10,7 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import java.util.UUID;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.Projectile;
@@ -34,6 +35,10 @@ public abstract class LivingEntitySkillMixin {
 	private boolean wh_hurtServer(
 		ServerLevel level, DamageSource source, float amount, Operation<Boolean> original
 	) {
+		// Battle Cry (Weak) — debuffed entities take 8% more damage from any source
+		UUID selfId = ((LivingEntity)(Object) this).getUUID();
+		amount *= SkillEffectService.getBattleCryTargetMult(selfId, level.getGameTime());
+
 		if ((Object) this instanceof ServerPlayer player) {
 			// Cactus immunity (Tough Skin / Iron Skin)
 			if (source.is(DamageTypes.CACTUS) && SkillEffectService.hasCactusImmunity(player)) {
@@ -45,6 +50,11 @@ public abstract class LivingEntitySkillMixin {
 					"\u00a7c[Wanderers Haven]\u00a7r Lucky Dodge! Projectile absorbed. (10 min cooldown)"
 				));
 				return false;
+			}
+			// Battle Cry (Weak) — debuffed attackers deal 8% less damage to this player
+			Entity attacker = source.getEntity();
+			if (attacker != null) {
+				amount *= SkillEffectService.getBattleCryAttackerMult(attacker.getUUID(), level.getGameTime());
 			}
 			// Pre-application damage reduction (same mechanic as Projectile Protection)
 			float mult = SkillEffectService.getDamageMultiplier(player, source);

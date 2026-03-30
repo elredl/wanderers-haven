@@ -143,6 +143,15 @@ public final class SkillRollEngine {
 		return Optional.empty();
 	}
 
+	/** Find a skill by its ID across all registered classes. */
+	public Optional<SkillDefinition> findById(String id) {
+		return registry.values().stream()
+			.flatMap(byPw -> byPw.values().stream())
+			.flatMap(List::stream)
+			.filter(s -> s.id().equals(id))
+			.findFirst();
+	}
+
 	/** Full SkillDefinition objects the player owns in the given class, sorted by PW. */
 	public List<SkillDefinition> ownedSkills(UUID playerId, String classId) {
 		Set<String> ids = ownedSkillIds(playerId, classId);

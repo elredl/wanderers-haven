@@ -6,8 +6,10 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.wanderershaven.classsystem.ClassSystemBootstrap;
 import com.wanderershaven.classsystem.evolution.ClassEvolutionDef;
 import com.wanderershaven.classsystem.evolution.EvolutionContext;
+import com.wanderershaven.network.PlayerNotificationStore;
 import com.wanderershaven.network.WanderersHavenNetworking;
 import com.wanderershaven.skill.SkillDefinition;
+import com.wanderershaven.skill.SkillEffectService;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -209,12 +211,11 @@ public final class WhCommand {
 		source.sendSuccess(
 			() -> Component.literal(
 				"[WH] " + target.getName().getString() + " is now Level " + newLevel + " in [" + classId + "]"
+				+ " — notifications will appear in their next GUI open."
 			),
 			true
 		);
-		target.sendSystemMessage(Component.literal(
-			"[Wanderers Haven] Admin granted you Level " + newLevel + " in [" + classId + "]!"
-		));
+		// Level-up processing (skill rolls, notifications) is deferred to the next GUI open.
 		return 1;
 	}
 
@@ -227,15 +228,16 @@ public final class WhCommand {
 		}
 
 		SkillDefinition skill = result.get();
+		SkillEffectService.applySkill(target, skill.id());
+		PlayerNotificationStore.recordSkillGrant(target.getUUID(), skill.displayName());
+
 		source.sendSuccess(
 			() -> Component.literal(
-				"[WH] Granted skill [" + skill.displayName() + "] (PW" + skill.powerLevel() + ") to " + target.getName().getString()
+				"[WH] Granted skill [" + skill.displayName() + "] (PW" + skill.powerLevel() + ") to "
+				+ target.getName().getString() + " — notification queued for their next GUI open."
 			),
 			true
 		);
-		target.sendSystemMessage(Component.literal(
-			"[Wanderers Haven] Skill granted: [" + skill.displayName() + "] (PW" + skill.powerLevel() + ") — " + skill.description()
-		));
 		return 1;
 	}
 }

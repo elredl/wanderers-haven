@@ -5,16 +5,16 @@ package com.wanderershaven.levelup;
  *
  *   totalXpForLevel(n) = baseXp * n²
  *
- * Examples with baseXp = 100:
- *   Level 1  →   100 XP total
- *   Level 2  →   400 XP total  (300 XP to advance)
- *   Level 5  →  2500 XP total
- *   Level 10 → 10000 XP total
- *   Level 20 → 40000 XP total
+ * Examples with baseXp = 500:
+ *   Level 1  →    500 XP total
+ *   Level 2  →   2000 XP total  (1500 XP to advance)
+ *   Level 5  →  12500 XP total
+ *   Level 10 →  50000 XP total
+ *   Level 20 → 200000 XP total
  */
 public record LevelCurve(double baseXp, int maxLevel) {
 	public static LevelCurve defaults() {
-		return new LevelCurve(100.0, 100);
+		return new LevelCurve(500.0, 100);
 	}
 
 	/** Total accumulated XP required to reach level {@code n} from zero. */
