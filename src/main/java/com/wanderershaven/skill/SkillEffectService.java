@@ -28,6 +28,7 @@ import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.core.Holder;
+import net.minecraft.core.particles.ParticleTypes;
 
 /**
  * Applies and removes active skill effects for players.
@@ -416,9 +417,16 @@ public final class SkillEffectService {
 		}
 		battleCryWeakCooldowns.put(player.getUUID(), now);
 		long expiresAt = now + BATTLE_CRY_WEAK_DURATION_TICKS;
+		// Angry particle burst visible to all nearby players
+		ServerLevel serverLevel = (ServerLevel) player.level();
+		double px = player.getX();
+		double py = player.getY() + 1.0;
+		double pz = player.getZ();
+		serverLevel.sendParticles(ParticleTypes.ANGRY_VILLAGER, px, py, pz, 40, 1.5, 0.8, 1.5, 0.4);
+		serverLevel.sendParticles(ParticleTypes.CRIT,           px, py, pz, 25, 1.5, 0.8, 1.5, 0.6);
 		List<LivingEntity> nearby = player.level().getEntitiesOfClass(
 			LivingEntity.class,
-			player.getBoundingBox().inflate(8.0),
+			player.getBoundingBox().inflate(3.5),
 			e -> e != player && (e instanceof Monster || (e instanceof Player && e != player))
 		);
 		if (nearby.isEmpty()) {
