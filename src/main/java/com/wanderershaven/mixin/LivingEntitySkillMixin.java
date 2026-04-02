@@ -40,6 +40,18 @@ public abstract class LivingEntitySkillMixin {
 		amount *= SkillEffectService.getBattleCryTargetMult(selfId, level.getGameTime());
 
 		if ((Object) this instanceof ServerPlayer player) {
+			// Focus — 60% dodge chance while buff is active
+			if (SkillEffectService.tryFocusDodge(player)) {
+				return false;
+			}
+			// Parry — counter-attack and deflect if the 0.5-sec window is active
+			if (SkillEffectService.tryParry(player)) {
+				return false;
+			}
+			// Shield's Protection — auto-block one attack every 7 sec while holding a shield
+			if (SkillEffectService.tryShieldsProtectionBlock(player)) {
+				return false;
+			}
 			// Cactus immunity (Tough Skin / Iron Skin)
 			if (source.is(DamageTypes.CACTUS) && SkillEffectService.hasCactusImmunity(player)) {
 				return false;
@@ -59,6 +71,13 @@ public abstract class LivingEntitySkillMixin {
 			// Pre-application damage reduction (same mechanic as Projectile Protection)
 			float mult = SkillEffectService.getDamageMultiplier(player, source);
 			return original.call(level, source, amount * mult);
+		}
+		// Aura of Righteousness — enemies within 17 blocks of a paladin take 15% more damage
+		amount *= SkillEffectService.getPaladinAuraEnemyMult((LivingEntity)(Object) this, level);
+		// Burning Justice — paladin's strikes deal 18% bonus damage (36% for undead) and ignite
+		if (source.getEntity() instanceof ServerPlayer attacker) {
+			amount *= SkillEffectService.getBurningJusticeDamageMult((LivingEntity)(Object) this, attacker);
+			SkillEffectService.applyBurningJusticeFireOnHit((LivingEntity)(Object) this, attacker);
 		}
 		return original.call(level, source, amount);
 	}

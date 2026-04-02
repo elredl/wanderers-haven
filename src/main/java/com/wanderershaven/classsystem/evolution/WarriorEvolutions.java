@@ -1,5 +1,10 @@
 package com.wanderershaven.classsystem.evolution;
 
+import com.wanderershaven.skill.BerserkerSkills;
+import com.wanderershaven.skill.BlademasterSkills;
+import com.wanderershaven.skill.DuelistSkills;
+import com.wanderershaven.skill.PaladinSkills;
+import com.wanderershaven.skill.VanguardSkills;
 import java.util.List;
 
 /**
@@ -43,7 +48,8 @@ public final class WarriorEvolutions {
 			List.of(
 				EvolutionPrerequisite.classLevel(25),
 				EvolutionPrerequisite.nearDeathSurvivals(20)
-			)
+			),
+			BerserkerSkills.skillSet()
 		);
 	}
 
@@ -60,7 +66,8 @@ public final class WarriorEvolutions {
 			List.of(
 				EvolutionPrerequisite.classLevel(25),
 				EvolutionPrerequisite.killsOfCategory("undead", 200)
-			)
+			),
+			PaladinSkills.skillSet()
 		);
 	}
 
@@ -77,7 +84,8 @@ public final class WarriorEvolutions {
 			List.of(
 				EvolutionPrerequisite.classLevel(25),
 				EvolutionPrerequisite.blockedHits(200)
-			)
+			),
+			VanguardSkills.skillSet()
 		);
 	}
 
@@ -97,7 +105,8 @@ public final class WarriorEvolutions {
 			List.of(
 				EvolutionPrerequisite.classLevel(25),
 				EvolutionPrerequisite.killsWithWeapon("duelist", 200)
-			)
+			),
+			DuelistSkills.skillSet()
 		);
 	}
 
@@ -133,7 +142,8 @@ public final class WarriorEvolutions {
 			List.of(
 				EvolutionPrerequisite.classLevel(25),
 				EvolutionPrerequisite.killsWithWeapon("blademaster", 200)
-			)
+			),
+			BlademasterSkills.skillSet()
 		);
 	}
 

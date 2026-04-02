@@ -24,10 +24,26 @@ public record ClassEvolutionDef(
 	/** Flavour text and mechanical description shown to the player. */
 	String description,
 	/** All conditions that must be satisfied to be offered this path. */
-	List<EvolutionPrerequisite> prerequisites
+	List<EvolutionPrerequisite> prerequisites,
+	/**
+	 * The capstone skill granted on acceptance and the exclusive skills added to
+	 * this evolution's roll pool. Null until skills for this path are defined.
+	 */
+	EvolutionSkillSet skillSet
 ) {
 	public ClassEvolutionDef {
 		prerequisites = List.copyOf(prerequisites);
+	}
+
+	/** Convenience constructor for evolutions whose skill set is not yet defined. */
+	public ClassEvolutionDef(
+		String id,
+		String baseClassId,
+		String displayName,
+		String description,
+		List<EvolutionPrerequisite> prerequisites
+	) {
+		this(id, baseClassId, displayName, description, prerequisites, null);
 	}
 
 	/** Returns true if all prerequisites are met in the given context. */

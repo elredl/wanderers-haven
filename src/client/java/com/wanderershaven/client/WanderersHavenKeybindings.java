@@ -21,6 +21,9 @@ public final class WanderersHavenKeybindings {
 	/** Opens the radial active-skill menu while held. Default: Middle Mouse Button. */
 	public static KeyMapping radialMenu;
 
+	/** Opens the character stats screen. Default: M. */
+	public static KeyMapping statsScreen;
+
 	private WanderersHavenKeybindings() {}
 
 	public static void register() {
@@ -28,6 +31,13 @@ public final class WanderersHavenKeybindings {
 			"key.wanderers_haven.radial_menu",
 			InputConstants.Type.MOUSE,
 			2, // GLFW_MOUSE_BUTTON_MIDDLE
+			CATEGORY
+		));
+
+		statsScreen = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+			"key.wanderers_haven.stats",
+			InputConstants.Type.KEYSYM,
+			InputConstants.KEY_M,
 			CATEGORY
 		));
 	}

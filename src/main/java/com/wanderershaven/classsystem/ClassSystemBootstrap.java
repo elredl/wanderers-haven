@@ -6,9 +6,16 @@ import com.wanderershaven.levelup.ClassLevelEngine;
 import com.wanderershaven.levelup.DefaultFeatDefinitions;
 import com.wanderershaven.levelup.FeatDefinition;
 import com.wanderershaven.skill.ActiveSkillSlots;
+import com.wanderershaven.skill.BerserkerSkills;
+import com.wanderershaven.skill.BlademasterSkills;
+import com.wanderershaven.skill.DuelistSkills;
+import com.wanderershaven.skill.PaladinSkills;
+import com.wanderershaven.skill.VanguardSkills;
 import com.wanderershaven.skill.SkillDefinition;
 import com.wanderershaven.skill.SkillRollEngine;
 import com.wanderershaven.skill.WarriorSkills;
+import com.wanderershaven.stat.PlayerStatEngine;
+import com.wanderershaven.stat.SkillStatTable;
 import java.util.List;
 
 public final class ClassSystemBootstrap {
@@ -19,9 +26,28 @@ public final class ClassSystemBootstrap {
 	private static final ClassLevelEngine LEVEL_ENGINE = new ClassLevelEngine(
 		DefaultFeatDefinitions.create()
 	);
-	private static final SkillRollEngine SKILL_ENGINE = new SkillRollEngine(
-		WarriorSkills.all()
-	);
+	private static final SkillRollEngine SKILL_ENGINE = buildSkillEngine();
+
+	private static SkillRollEngine buildSkillEngine() {
+		SkillRollEngine engine = new SkillRollEngine(WarriorSkills.all());
+		// Register evolution-exclusive skills at startup so forceGrantSkill can find them
+		// and the roll engine can filter them for non-evolution players.
+		// Add each new evolution's skills here as they are designed.
+		engine.registerEvolutionSkills("warrior_berserker", BerserkerSkills.all());
+		engine.registerEvolutionSkills("warrior_paladin",   PaladinSkills.all());
+		engine.registerEvolutionSkills("warrior_vanguard",  VanguardSkills.all());
+		engine.registerEvolutionSkills("warrior_duelist",      DuelistSkills.all());
+		engine.registerEvolutionSkills("warrior_blademaster",  BlademasterSkills.all());
+		return engine;
+	}
+	private static final PlayerStatEngine STAT_ENGINE = buildStatEngine();
+
+	private static PlayerStatEngine buildStatEngine() {
+		PlayerStatEngine engine = new PlayerStatEngine();
+		SkillStatTable.register(engine);
+		return engine;
+	}
+
 	private static final ClassEvolutionEngine EVOLUTION_ENGINE = new ClassEvolutionEngine(
 		WarriorEvolutions.all()
 	);
@@ -73,6 +99,10 @@ public final class ClassSystemBootstrap {
 
 	public static ActiveSkillSlots activeSkillSlots() {
 		return ACTIVE_SKILL_SLOTS;
+	}
+
+	public static PlayerStatEngine statEngine() {
+		return STAT_ENGINE;
 	}
 
 	public static void registerSkill(SkillDefinition skill) {

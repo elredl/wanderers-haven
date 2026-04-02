@@ -11,6 +11,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * Handles skill roll probability, power-level selection, and skill award tracking.
@@ -38,6 +39,14 @@ public final class SkillRollEngine {
 	// playerId → classId → owned skill IDs
 	private final Map<UUID, Map<String, Set<String>>> playerSkills = new ConcurrentHashMap<>();
 
+	// evolutionId → set of skill IDs exclusive to that evolution
+	// Exclusive skills are still registered in the main registry under their classId,
+	// but they are filtered out for players who have not accepted that evolution.
+	private final Map<String, Set<String>> evolutionExclusiveIds = new ConcurrentHashMap<>();
+
+	// playerId → baseClassId → evolutionId the player has accepted
+	private final Map<UUID, Map<String, String>> playerEvolutions = new ConcurrentHashMap<>();
+
 	public SkillRollEngine(Collection<SkillDefinition> initialSkills) {
 		for (SkillDefinition skill : initialSkills) {
 			register(skill);
@@ -48,6 +57,37 @@ public final class SkillRollEngine {
 		registry.computeIfAbsent(skill.classId(), k -> new ConcurrentHashMap<>())
 			.computeIfAbsent(skill.powerLevel(), k -> new ArrayList<>())
 			.add(skill);
+	}
+
+	/**
+	 * Register a list of skills as exclusive to a specific evolution path, then add
+	 * them to the main registry. Exclusive skills are only offered to players who
+	 * have accepted that evolution — all others never see them in rolls.
+	 *
+	 * <p>All exclusive skills must use the base class ID (e.g. {@code "warrior"})
+	 * so they appear in the player's unified skill list.
+	 */
+	public void registerEvolutionSkills(String evolutionId, List<SkillDefinition> skills) {
+		Set<String> ids = evolutionExclusiveIds.computeIfAbsent(evolutionId, k -> ConcurrentHashMap.newKeySet());
+		for (SkillDefinition skill : skills) {
+			register(skill);
+			ids.add(skill.id());
+		}
+	}
+
+	/**
+	 * Record that a player has accepted an evolution, unlocking that evolution's
+	 * exclusive skill pool for future rolls.
+	 */
+	public void grantEvolutionAccess(UUID playerId, String baseClassId, String evolutionId) {
+		playerEvolutions.computeIfAbsent(playerId, k -> new ConcurrentHashMap<>())
+			.put(baseClassId, evolutionId);
+	}
+
+	/** The evolution ID the player has accepted for the given base class, or null. */
+	public String playerEvolutionFor(UUID playerId, String baseClassId) {
+		Map<String, String> byClass = playerEvolutions.get(playerId);
+		return byClass == null ? null : byClass.get(baseClassId);
 	}
 
 	/**
@@ -70,15 +110,20 @@ public final class SkillRollEngine {
 		}
 
 		Set<String> owned = ownedSkillIds(playerId, classId);
+		String evolutionId = playerEvolutionFor(playerId, classId);
 		int W = windowPw(newLevel);
 
 		int selectedPw = (newLevel % 5 == 0) ? W : rollPowerLevel(W, byPw);
 
-		List<SkillDefinition> candidates = unownedAt(byPw, owned, selectedPw);
+		List<SkillDefinition> candidates = unownedAt(byPw, owned, selectedPw).stream()
+			.filter(s -> isAccessibleTo(s.id(), evolutionId))
+			.collect(Collectors.toList());
 
 		// Fallback: any unowned skill across all PWs if the target PW is exhausted
 		if (candidates.isEmpty()) {
-			candidates = allUnowned(byPw, owned);
+			candidates = allUnowned(byPw, owned).stream()
+				.filter(s -> isAccessibleTo(s.id(), evolutionId))
+				.collect(Collectors.toList());
 		}
 
 		if (candidates.isEmpty()) {
@@ -274,6 +319,21 @@ public final class SkillRollEngine {
 			.flatMap(List::stream)
 			.filter(s -> !owned.contains(s.id()))
 			.toList();
+	}
+
+	/**
+	 * Returns true if the skill is accessible to a player with the given evolution.
+	 *
+	 * A skill is accessible when it is not exclusive to any evolution, or when it is
+	 * exclusive to exactly the evolution the player has accepted.
+	 */
+	private boolean isAccessibleTo(String skillId, String playerEvolution) {
+		for (Map.Entry<String, Set<String>> entry : evolutionExclusiveIds.entrySet()) {
+			if (entry.getValue().contains(skillId)) {
+				return entry.getKey().equals(playerEvolution);
+			}
+		}
+		return true;
 	}
 
 	// LinkedHashMap preserves insertion order for the weighted random iteration

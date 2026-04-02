@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -154,9 +155,12 @@ public final class ClassEvolutionEngine {
 
 	/**
 	 * Record that the player has accepted an evolution path.
-	 * Returns false if the evolution ID is not registered.
+	 *
+	 * Returns the accepted {@link ClassEvolutionDef} so the caller can apply the
+	 * capstone skill and register exclusive skills. Returns empty if the evolution
+	 * ID is not registered.
 	 */
-	public boolean acceptEvolution(UUID playerId, String evolutionId) {
+	public Optional<ClassEvolutionDef> acceptEvolution(UUID playerId, String evolutionId) {
 		for (Map.Entry<String, List<ClassEvolutionDef>> entry : evolutionsByBase.entrySet()) {
 			for (ClassEvolutionDef def : entry.getValue()) {
 				if (def.id().equals(evolutionId)) {
@@ -164,11 +168,11 @@ public final class ClassEvolutionEngine {
 						.computeIfAbsent(playerId, k -> new ConcurrentHashMap<>())
 						.put(def.baseClassId(), evolutionId);
 					clearPendingOffer(playerId);
-					return true;
+					return Optional.of(def);
 				}
 			}
 		}
-		return false;
+		return Optional.empty();
 	}
 
 	/** Returns the accepted evolution ID for the given base class, or null if none chosen. */

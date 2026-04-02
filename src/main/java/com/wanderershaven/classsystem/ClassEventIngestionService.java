@@ -302,21 +302,10 @@ public final class ClassEventIngestionService {
 			PlayerNotificationStore.recordLevelUp(
 				player.getUUID(), event.classId(), classDisplayName, event.newLevel());
 
-			skillEngine.tryRollSkill(player.getUUID(), event.classId(), event.newLevel())
-				.ifPresent(result -> {
-					SkillEffectService.applySkill(player, result.granted().id());
-					if (result.isUpgrade()) {
-						String oldName = skillEngine.findById(result.supersededId())
-							.map(SkillDefinition::displayName)
-							.orElse(result.supersededId());
-						PlayerNotificationStore.recordSkillChange(
-							player.getUUID(), oldName, result.granted().displayName());
-					} else {
-						PlayerNotificationStore.recordSkillGrant(
-							player.getUUID(), result.granted().displayName());
-					}
-				});
-
+			// At evolution milestones, check for eligible evolutions FIRST.
+			// If any are offered, skip the normal skill roll — the capstone from the
+			// chosen evolution replaces it and is granted when the player accepts.
+			boolean evolutionOffered = false;
 			if (event.newLevel() % 25 == 0) {
 				Set<String> ownedClassIds = inferenceEngine.profile(player.getUUID())
 					.map(PlayerClassProfile::obtainedClasses)
@@ -327,8 +316,26 @@ public final class ClassEventIngestionService {
 				);
 				if (!offers.isEmpty()) {
 					evolutionEngine.setPendingOffer(player.getUUID(), offers);
+					evolutionOffered = true;
 					// Evolution is bundled into the OpenSkillManagementPayload — no separate packet needed.
 				}
+			}
+
+			if (!evolutionOffered) {
+				skillEngine.tryRollSkill(player.getUUID(), event.classId(), event.newLevel())
+					.ifPresent(result -> {
+						SkillEffectService.applySkill(player, result.granted().id());
+						if (result.isUpgrade()) {
+							String oldName = skillEngine.findById(result.supersededId())
+								.map(SkillDefinition::displayName)
+								.orElse(result.supersededId());
+							PlayerNotificationStore.recordSkillChange(
+								player.getUUID(), oldName, result.granted().displayName());
+						} else {
+							PlayerNotificationStore.recordSkillGrant(
+								player.getUUID(), result.granted().displayName());
+						}
+					});
 			}
 		}
 	}

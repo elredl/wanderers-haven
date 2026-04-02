@@ -4,6 +4,7 @@ import com.wanderershaven.classsystem.ClassDefinition;
 import com.wanderershaven.classsystem.ClassInferenceEngine;
 import com.wanderershaven.classsystem.ClassSystemBootstrap;
 import com.wanderershaven.classsystem.evolution.ClassEvolutionDef;
+import com.wanderershaven.classsystem.evolution.EvolutionSkillSet;
 import com.wanderershaven.skill.ActiveSkillSlots;
 import com.wanderershaven.skill.SkillDefinition;
 import com.wanderershaven.skill.SkillEffectService;
@@ -76,12 +77,9 @@ public final class WanderersHavenNetworking {
 		ServerPlayNetworking.registerGlobalReceiver(EvolutionChoicePayload.TYPE, (payload, context) -> {
 			context.server().execute(() -> {
 				ServerPlayer player = context.player();
-				boolean accepted = ClassSystemBootstrap.evolutionEngine().acceptEvolution(player.getUUID(), payload.evolutionId());
-				if (accepted) {
-					player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
-						"[Wanderers Haven] Evolution locked in: " + payload.evolutionId()
-					));
-				}
+				ClassSystemBootstrap.evolutionEngine()
+					.acceptEvolution(player.getUUID(), payload.evolutionId())
+					.ifPresent(def -> applyEvolutionSkills(player, def));
 			});
 		});
 
@@ -121,10 +119,12 @@ public final class WanderersHavenNetworking {
 			}
 		});
 
-		// Clean up slot data and queued notifications when a player disconnects
+		// Clean up slot data, queued notifications, and stat engine state when a player disconnects
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
-			ClassSystemBootstrap.activeSkillSlots().remove(handler.player.getUUID());
-			PlayerNotificationStore.clear(handler.player.getUUID());
+			UUID uuid = handler.player.getUUID();
+			ClassSystemBootstrap.activeSkillSlots().remove(uuid);
+			PlayerNotificationStore.clear(uuid);
+			ClassSystemBootstrap.statEngine().removePlayer(uuid);
 		});
 	}
 
@@ -231,16 +231,48 @@ public final class WanderersHavenNetworking {
 	 */
 	private static void executeActiveSkill(ServerPlayer player, String skillId) {
 		switch (skillId) {
-			case "warrior_heavy_strikes"   -> SkillEffectService.executeHeavyStrikes(player);
-			case "warrior_battle_cry_weak" -> SkillEffectService.executeBattleCryWeak(player);
-			case "warrior_bludgeon"        -> SkillEffectService.executeBludgeon(player);
-			case "warrior_piercing_charge" -> SkillEffectService.executePiercingCharge(player);
+			case "warrior_heavy_strikes"            -> SkillEffectService.executeHeavyStrikes(player);
+			case "warrior_battle_cry_weak"          -> SkillEffectService.executeBattleCryWeak(player);
+			case "warrior_bludgeon"                 -> SkillEffectService.executeBludgeon(player);
+			case "warrior_piercing_charge"          -> SkillEffectService.executePiercingCharge(player);
+			case "warrior_berserker_fury_unleashed" -> SkillEffectService.executeFuryUnleashed(player);
+			case "warrior_paladin_smite"            -> SkillEffectService.executeSmite(player);
+			case "warrior_vanguard_shield_bash"     -> SkillEffectService.executeShieldBash(player);
+			case "warrior_duelist_parry"            -> SkillEffectService.executeParry(player);
+			case "warrior_duelist_flash_step"       -> SkillEffectService.executeFlashStep(player);
+			case "warrior_blademaster_circular_slash" -> SkillEffectService.executeCircularSlash(player);
+			case "warrior_blademaster_focus"          -> SkillEffectService.executeFocus(player);
 		}
 	}
 
 	// -------------------------------------------------------------------------
 	// Internal helpers
 	// -------------------------------------------------------------------------
+
+	/**
+	 * Apply all skill-related side-effects of accepting an evolution:
+	 * <ol>
+	 *   <li>Unlock the player's access to this evolution's exclusive roll pool.</li>
+	 *   <li>Grant the capstone skill (if defined) and notify the player.</li>
+	 * </ol>
+	 * Evolution skills are already registered in the engine at startup —
+	 * see {@link com.wanderershaven.classsystem.ClassSystemBootstrap}.
+	 */
+	private static void applyEvolutionSkills(ServerPlayer player, ClassEvolutionDef def) {
+		EvolutionSkillSet skillSet = def.skillSet();
+		if (skillSet == null) return;
+
+		// Unlock this evolution's exclusive skill pool for future rolls
+		ClassSystemBootstrap.skillEngine().grantEvolutionAccess(player.getUUID(), def.baseClassId(), def.id());
+
+		// Grant the capstone (replaces what would have been the milestone skill roll)
+		SkillDefinition capstone = skillSet.capstoneSkill();
+		if (capstone != null) {
+			ClassSystemBootstrap.skillEngine().forceGrantSkill(player.getUUID(), capstone.id());
+			SkillEffectService.applySkill(player, capstone.id());
+			PlayerNotificationStore.recordSkillGrant(player.getUUID(), capstone.displayName());
+		}
+	}
 
 	private static Set<String> allOwnedSkillIds(ServerPlayer player) {
 		return ClassSystemBootstrap.engine().registeredClasses().keySet().stream()

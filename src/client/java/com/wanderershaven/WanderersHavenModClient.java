@@ -2,6 +2,7 @@ package com.wanderershaven;
 
 import com.wanderershaven.client.ClientSkillState;
 import com.wanderershaven.client.WanderersHavenKeybindings;
+import com.wanderershaven.client.screen.StatsScreen;
 import com.wanderershaven.client.animation.SkillAnimationHandler;
 import com.wanderershaven.client.hud.DangersenseHud;
 import com.wanderershaven.client.screen.ClassSelectionScreen;
@@ -87,6 +88,13 @@ public class WanderersHavenModClient implements ClientModInitializer {
 				client.execute(() -> client.setScreen(new RadialSkillMenuScreen()));
 			}
 			radialWasHeld = radialHeld;
+
+			// Stats screen keybinding
+			while (WanderersHavenKeybindings.statsScreen.consumeClick()) {
+				if (client.player != null && client.screen == null) {
+					client.setScreen(new StatsScreen());
+				}
+			}
 
 			// Deferred skill management screen
 			if (pendingSkillManagement != null && client.screen == null) {
