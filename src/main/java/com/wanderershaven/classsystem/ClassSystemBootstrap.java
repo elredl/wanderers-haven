@@ -1,21 +1,17 @@
 package com.wanderershaven.classsystem;
 
 import com.wanderershaven.classsystem.evolution.ClassEvolutionEngine;
-import com.wanderershaven.classsystem.evolution.WarriorEvolutions;
+import com.wanderershaven.classsystem.evolution.ClassEvolutionDef;
+import com.wanderershaven.classsystem.evolution.EvolutionSkillSet;
 import com.wanderershaven.levelup.ClassLevelEngine;
 import com.wanderershaven.levelup.DefaultFeatDefinitions;
 import com.wanderershaven.levelup.FeatDefinition;
 import com.wanderershaven.skill.ActiveSkillSlots;
-import com.wanderershaven.skill.BerserkerSkills;
-import com.wanderershaven.skill.BlademasterSkills;
-import com.wanderershaven.skill.DuelistSkills;
-import com.wanderershaven.skill.PaladinSkills;
-import com.wanderershaven.skill.VanguardSkills;
 import com.wanderershaven.skill.SkillDefinition;
 import com.wanderershaven.skill.SkillRollEngine;
-import com.wanderershaven.skill.WarriorSkills;
 import com.wanderershaven.stat.PlayerStatEngine;
 import com.wanderershaven.stat.SkillStatTable;
+import java.util.ArrayList;
 import java.util.List;
 
 public final class ClassSystemBootstrap {
@@ -29,15 +25,19 @@ public final class ClassSystemBootstrap {
 	private static final SkillRollEngine SKILL_ENGINE = buildSkillEngine();
 
 	private static SkillRollEngine buildSkillEngine() {
-		SkillRollEngine engine = new SkillRollEngine(WarriorSkills.all());
-		// Register evolution-exclusive skills at startup so forceGrantSkill can find them
-		// and the roll engine can filter them for non-evolution players.
-		// Add each new evolution's skills here as they are designed.
-		engine.registerEvolutionSkills("warrior_berserker", BerserkerSkills.all());
-		engine.registerEvolutionSkills("warrior_paladin",   PaladinSkills.all());
-		engine.registerEvolutionSkills("warrior_vanguard",  VanguardSkills.all());
-		engine.registerEvolutionSkills("warrior_duelist",      DuelistSkills.all());
-		engine.registerEvolutionSkills("warrior_blademaster",  BlademasterSkills.all());
+		List<ClassContentDefinition> content = DefaultClassContent.all();
+		List<SkillDefinition> baseSkills = content.stream()
+			.flatMap(c -> c.baseSkills().stream())
+			.toList();
+		SkillRollEngine engine = new SkillRollEngine(baseSkills);
+		for (ClassContentDefinition classContent : content) {
+			for (ClassEvolutionDef evolution : classContent.evolutions()) {
+				List<SkillDefinition> evolutionSkills = skillsForEvolution(evolution.skillSet());
+				if (!evolutionSkills.isEmpty()) {
+					engine.registerEvolutionSkills(evolution.id(), evolutionSkills);
+				}
+			}
+		}
 		return engine;
 	}
 	private static final PlayerStatEngine STAT_ENGINE = buildStatEngine();
@@ -49,7 +49,9 @@ public final class ClassSystemBootstrap {
 	}
 
 	private static final ClassEvolutionEngine EVOLUTION_ENGINE = new ClassEvolutionEngine(
-		WarriorEvolutions.all()
+		DefaultClassContent.all().stream()
+			.flatMap(c -> c.evolutions().stream())
+			.toList()
 	);
 	private static final ClassEventIngestionService INGESTION_SERVICE = new ClassEventIngestionService(
 		ENGINE, LEVEL_ENGINE, SKILL_ENGINE, EVOLUTION_ENGINE
@@ -107,6 +109,15 @@ public final class ClassSystemBootstrap {
 
 	public static void registerSkill(SkillDefinition skill) {
 		SKILL_ENGINE.register(skill);
+	}
+
+	private static List<SkillDefinition> skillsForEvolution(EvolutionSkillSet skillSet) {
+		if (skillSet == null) return List.of();
+		List<SkillDefinition> all = new ArrayList<>(skillSet.exclusiveSkills());
+		if (skillSet.capstoneSkill() != null) {
+			all.add(skillSet.capstoneSkill());
+		}
+		return all;
 	}
 
 	public static List<ClassConditionNotification> drainNotifications(java.util.UUID playerId) {

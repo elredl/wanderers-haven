@@ -16,7 +16,7 @@ public final class VanguardSkills {
 	// ── Capstone ──────────────────────────────────────────────────────────────
 
 	private static final SkillDefinition SHIELDS_PROTECTION = skill(
-		"warrior_vanguard_shields_protection", 3,
+		"shields_protection", 3,
 		"Shield's Protection",
 		"Your shield anticipates the blow before you do. While holding a shield, one incoming attack "
 			+ "is completely blocked automatically every 7 seconds — no reaction required."
@@ -25,15 +25,15 @@ public final class VanguardSkills {
 	// ── Exclusive roll pool ───────────────────────────────────────────────────
 
 	private static final SkillDefinition SHIELD_BASH = activeUpgrade(
-		"warrior_vanguard_shield_bash", 3,
+		"shield_bash", 3,
 		"Shield Bash",
 		"Drive your shield into every enemy in front of you, launching them back and reducing their armor "
 			+ "by 25% for 5 seconds. All targets hit are stunned for 1 second. Requires a shield in hand. (15 sec cooldown)",
-		"warrior_bludgeon"
+		"bludgeon"
 	);
 
 	private static final SkillDefinition STAND_YOUR_GROUND = skill(
-		"warrior_vanguard_stand_your_ground", 4,
+		"stand_your_ground", 4,
 		"Stand Your Ground",
 		"You do not move. You cannot be knocked back. Each consecutive hit you absorb stacks 5% damage "
 			+ "reduction (up to 60%) for 15 seconds — the timer resets on every hit."
@@ -54,10 +54,10 @@ public final class VanguardSkills {
 	// ── Helpers ───────────────────────────────────────────────────────────────
 
 	private static SkillDefinition skill(String id, int powerLevel, String displayName, String description) {
-		return new SkillDefinition(id, CLASS, powerLevel, displayName, description, null, false);
+		return SkillDefs.passive(CLASS, id, powerLevel, displayName, description);
 	}
 
 	private static SkillDefinition activeUpgrade(String id, int powerLevel, String displayName, String description, String supersedesId) {
-		return new SkillDefinition(id, CLASS, powerLevel, displayName, description, supersedesId, true);
+		return SkillDefs.activeUpgrade(CLASS, id, powerLevel, displayName, description, supersedesId);
 	}
 }

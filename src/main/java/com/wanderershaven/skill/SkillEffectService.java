@@ -19,7 +19,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.monster.Enemy;
@@ -50,6 +49,7 @@ public final class SkillEffectService {
 
 	public static final Identifier BLUDGEON_ARMOR_MOD    = Identifier.fromNamespaceAndPath("wanderers_haven", "bludgeon_armor");
 	public static final Identifier SHIELD_BASH_ARMOR_MOD = Identifier.fromNamespaceAndPath("wanderers_haven", "shield_bash_armor");
+	public static final Identifier HARMONY_PAIN_SLOW_MOD = Identifier.fromNamespaceAndPath("wanderers_haven", "harmony_pain_slow");
 
 	// ── Cooldown / duration constants ─────────────────────────────────────────
 
@@ -77,6 +77,13 @@ public final class SkillEffectService {
 	private static final long PARRY_WINDOW_TICKS                 =    10L;
 	private static final long FLASH_STEP_COOLDOWN_TICKS          =   160L;
 	private static final long FLASH_STEP_SPEED_DURATION_TICKS    =    60L;
+	private static final long DANCE_OF_FALLING_PETALS_COOLDOWN_TICKS = 600L;
+	private static final long DANCE_OF_FALLING_PETALS_DURATION_TICKS = 200L;
+	private static final long DANCE_OF_FALLING_PETALS_PULSE_INTERVAL_TICKS = 8L;
+	private static final long HARMONY_OF_PAIN_COOLDOWN_TICKS     =   900L;
+	private static final long HARMONY_OF_PAIN_DURATION_TICKS     =   200L;
+	private static final long DANCE_OF_THE_BUTTERFLY_COOLDOWN_TICKS = 400L;
+	private static final long DANCE_OF_THE_BUTTERFLY_DURATION_TICKS = 100L;
 	private static final long SHIELDS_PROTECTION_COOLDOWN_TICKS  =   140L;
 	private static final long SHIELD_BASH_COOLDOWN_TICKS         =   300L;
 	private static final long SHIELD_BASH_ARMOR_DEBUFF_TICKS     =   100L;
@@ -84,33 +91,26 @@ public final class SkillEffectService {
 	private static final long STAND_YOUR_GROUND_WINDOW_TICKS     =   300L;
 	private static final int  STAND_YOUR_GROUND_MAX_STACKS       =    12;
 
+	private static final String EFX_LAST_STAND = "last_stand";
+	private static final String EFX_HEAVY_STRIKES = "heavy_strikes";
+	private static final String EFX_FIGHTING_SPIRIT = "fighting_spirit";
+	private static final String EFX_FURY_UNLEASHED = "fury_unleashed";
+	private static final String EFX_FOCUS = "focus";
+	private static final String EFX_PARRY_WINDOW = "parry_window";
+	private static final String EFX_FLASH_STEP = "flash_step_speed";
+	private static final String EFX_FALLING_PETALS = "falling_petals";
+	private static final String EFX_BUTTERFLY = "dance_of_butterfly";
+
+	private static final SkillCooldownService COOLDOWNS = new SkillCooldownService();
+	private static final TimedEffectTracker EFFECTS = new TimedEffectTracker();
+	private static final CombatDebuffService COMBAT_DEBUFFS = new CombatDebuffService();
+	private static final EntityAttributeDebuffService ATTRIBUTE_DEBUFFS = new EntityAttributeDebuffService();
+	private static final ActiveSkillRegistry ACTIVE_SKILLS = buildActiveSkillRegistry();
+
 	// ── State maps ────────────────────────────────────────────────────────────
 
-	private static final Map<UUID, Long>  luckyDodgeCooldowns         = new ConcurrentHashMap<>();
-	private static final Map<UUID, Long>  secondWindCooldowns         = new ConcurrentHashMap<>();
-	private static final Map<UUID, Long>  lastStandCooldowns          = new ConcurrentHashMap<>();
-	private static final Map<UUID, Long>  lastStandActivatedAt        = new ConcurrentHashMap<>();
-	private static final Map<UUID, Long>  heavyStrikesCooldowns       = new ConcurrentHashMap<>();
-	private static final Map<UUID, Long>  heavyStrikesActivatedAt     = new ConcurrentHashMap<>();
-	private static final Map<UUID, Long>  battleCryWeakCooldowns      = new ConcurrentHashMap<>();
-	private static final Map<UUID, Long>  battleCryDebuffedEntities   = new ConcurrentHashMap<>();
-	private static final Map<UUID, Long>  bludgeonCooldowns           = new ConcurrentHashMap<>();
-	private static final Map<UUID, Long>  bludgeonedEntities          = new ConcurrentHashMap<>();
-	private static final Map<UUID, Long>  piercingChargeCooldowns     = new ConcurrentHashMap<>();
-	private static final Map<UUID, Long>  fightingSpiritCooldowns     = new ConcurrentHashMap<>();
-	private static final Map<UUID, Long>  fightingSpiritActivatedAt   = new ConcurrentHashMap<>();
 	private static final Map<UUID, Float> furyPoints                  = new ConcurrentHashMap<>();
-	private static final Map<UUID, Long>  furyUnleashedCooldowns      = new ConcurrentHashMap<>();
-	private static final Map<UUID, Long>  furyUnleashedActivatedAt    = new ConcurrentHashMap<>();
-	private static final Map<UUID, Long>  smiteCooldowns              = new ConcurrentHashMap<>();
-	private static final Map<UUID, Long>  circularSlashCooldowns      = new ConcurrentHashMap<>();
-	private static final Map<UUID, Long>  focusCooldowns              = new ConcurrentHashMap<>();
-	private static final Map<UUID, Long>  focusActivatedAt            = new ConcurrentHashMap<>();
-	private static final Map<UUID, Long>  parryActivatedAt            = new ConcurrentHashMap<>();
-	private static final Map<UUID, Long>  flashStepCooldowns          = new ConcurrentHashMap<>();
-	private static final Map<UUID, Long>  flashStepSpeedExpiresAt     = new ConcurrentHashMap<>();
-	private static final Map<UUID, Long>  shieldsProtectionLastBlock  = new ConcurrentHashMap<>();
-	private static final Map<UUID, Long>  shieldBashCooldowns         = new ConcurrentHashMap<>();
+	private static final Map<UUID, Set<UUID>> danceOfTheButterflyHitEntities = new ConcurrentHashMap<>();
 	private static final Map<UUID, Integer> sygStacks                 = new ConcurrentHashMap<>();
 	private static final Map<UUID, Long>    sygLastHitAt              = new ConcurrentHashMap<>();
 
@@ -148,128 +148,157 @@ public final class SkillEffectService {
 			ClassSystemBootstrap.statEngine().tick(server));
 
 		// Last Stand — expire buff after 10 seconds
-		ServerTickEvents.END_SERVER_TICK.register(server ->
-			lastStandActivatedAt.entrySet().removeIf(entry -> {
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			for (Map.Entry<UUID, TimedEffectTracker.Window> entry : EFFECTS.snapshot(EFX_LAST_STAND).entrySet()) {
 				ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
 				if (player == null) {
 					ClassSystemBootstrap.statEngine().deactivateSource(entry.getKey(), "last_stand_buff", null);
-					return true;
+					EFFECTS.clear(entry.getKey(), EFX_LAST_STAND);
+					continue;
 				}
-				if (player.level().getGameTime() - entry.getValue() >= LAST_STAND_DURATION_TICKS) {
+				if (player.level().getGameTime() >= entry.getValue().expiresAt()) {
 					removeLastStand(player);
-					return true;
+					EFFECTS.clear(player.getUUID(), EFX_LAST_STAND);
 				}
-				return false;
-			})
-		);
+			}
+		});
 
 		// Heavy Strikes — expire buff after 10 seconds
-		ServerTickEvents.END_SERVER_TICK.register(server ->
-			heavyStrikesActivatedAt.entrySet().removeIf(entry -> {
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			for (Map.Entry<UUID, TimedEffectTracker.Window> entry : EFFECTS.snapshot(EFX_HEAVY_STRIKES).entrySet()) {
 				ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
 				if (player == null) {
 					ClassSystemBootstrap.statEngine().deactivateSource(entry.getKey(), "heavy_strikes_buff", null);
-					return true;
+					EFFECTS.clear(entry.getKey(), EFX_HEAVY_STRIKES);
+					continue;
 				}
-				if (player.level().getGameTime() - entry.getValue() >= HEAVY_STRIKES_DURATION_TICKS) {
+				if (player.level().getGameTime() >= entry.getValue().expiresAt()) {
 					removeHeavyStrikes(player);
-					return true;
+					EFFECTS.clear(player.getUUID(), EFX_HEAVY_STRIKES);
 				}
-				return false;
-			})
-		);
+			}
+		});
 
-		// Bludgeon / Shield Bash — remove enemy armor reduction after expiry
-		ServerTickEvents.END_SERVER_TICK.register(server ->
-			bludgeonedEntities.entrySet().removeIf(entry -> {
-				for (ServerLevel sl : server.getAllLevels()) {
-					net.minecraft.world.entity.Entity entity = sl.getEntity(entry.getKey());
-					if (entity instanceof LivingEntity living) {
-						if (sl.getGameTime() >= entry.getValue()) {
-							AttributeInstance armorInst = living.getAttribute(Attributes.ARMOR);
-							if (armorInst != null) {
-								armorInst.removeModifier(BLUDGEON_ARMOR_MOD);
-								armorInst.removeModifier(SHIELD_BASH_ARMOR_MOD);
-							}
-							return true;
-						}
-						return false;
-					}
-				}
-				return true;
-			})
-		);
+		// Timed entity-attribute debuffs (armor slow etc.)
+		ServerTickEvents.END_SERVER_TICK.register(ATTRIBUTE_DEBUFFS::tick);
 
 		// Fighting Spirit — expire 50% DR window after 30 seconds
-		ServerTickEvents.END_SERVER_TICK.register(server ->
-			fightingSpiritActivatedAt.entrySet().removeIf(entry -> {
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			for (Map.Entry<UUID, TimedEffectTracker.Window> entry : EFFECTS.snapshot(EFX_FIGHTING_SPIRIT).entrySet()) {
 				ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
-				if (player == null) return true;
-				if (player.level().getGameTime() - entry.getValue() >= FIGHTING_SPIRIT_DURATION_TICKS) {
+				if (player == null) {
+					EFFECTS.clear(entry.getKey(), EFX_FIGHTING_SPIRIT);
+					continue;
+				}
+				if (player.level().getGameTime() >= entry.getValue().expiresAt()) {
 					player.sendSystemMessage(Component.literal(
 						"\u00a77[Wanderers Haven]\u00a7r Fighting Spirit faded."));
-					return true;
+					EFFECTS.clear(player.getUUID(), EFX_FIGHTING_SPIRIT);
 				}
-				return false;
-			})
-		);
+			}
+		});
 
 		// Fury Unleashed — expire damage/size buff after 1 minute
-		ServerTickEvents.END_SERVER_TICK.register(server ->
-			furyUnleashedActivatedAt.entrySet().removeIf(entry -> {
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			for (Map.Entry<UUID, TimedEffectTracker.Window> entry : EFFECTS.snapshot(EFX_FURY_UNLEASHED).entrySet()) {
 				ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
 				if (player == null) {
 					ClassSystemBootstrap.statEngine().deactivateSource(entry.getKey(), "fury_unleashed_buff", null);
-					return true;
+					EFFECTS.clear(entry.getKey(), EFX_FURY_UNLEASHED);
+					continue;
 				}
-				if (player.level().getGameTime() - entry.getValue() >= FURY_UNLEASHED_DURATION_TICKS) {
+				if (player.level().getGameTime() >= entry.getValue().expiresAt()) {
 					removeFuryUnleashedBuff(player);
-					return true;
+					EFFECTS.clear(player.getUUID(), EFX_FURY_UNLEASHED);
 				}
-				return false;
-			})
-		);
+			}
+		});
 
 		// Flash Step — expire speed buff
-		ServerTickEvents.END_SERVER_TICK.register(server ->
-			flashStepSpeedExpiresAt.entrySet().removeIf(entry -> {
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			for (Map.Entry<UUID, TimedEffectTracker.Window> entry : EFFECTS.snapshot(EFX_FLASH_STEP).entrySet()) {
 				ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
 				if (player == null) {
 					ClassSystemBootstrap.statEngine().deactivateSource(entry.getKey(), "flash_step_buff", null);
-					return true;
+					EFFECTS.clear(entry.getKey(), EFX_FLASH_STEP);
+					continue;
 				}
-				if (player.level().getGameTime() >= entry.getValue()) {
+				if (player.level().getGameTime() >= entry.getValue().expiresAt()) {
 					ClassSystemBootstrap.statEngine().deactivateSource(player.getUUID(), "flash_step_buff", player);
-					return true;
+					EFFECTS.clear(player.getUUID(), EFX_FLASH_STEP);
 				}
-				return false;
-			})
-		);
+			}
+		});
 
 		// Focus — expire damage amp and dodge chance after 30 seconds
-		ServerTickEvents.END_SERVER_TICK.register(server ->
-			focusActivatedAt.entrySet().removeIf(entry -> {
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			for (Map.Entry<UUID, TimedEffectTracker.Window> entry : EFFECTS.snapshot(EFX_FOCUS).entrySet()) {
 				ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
 				if (player == null) {
 					ClassSystemBootstrap.statEngine().deactivateSource(entry.getKey(), "focus_buff", null);
-					return true;
+					EFFECTS.clear(entry.getKey(), EFX_FOCUS);
+					continue;
 				}
-				if (player.level().getGameTime() - entry.getValue() >= FOCUS_DURATION_TICKS) {
+				if (player.level().getGameTime() >= entry.getValue().expiresAt()) {
 					ClassSystemBootstrap.statEngine().deactivateSource(player.getUUID(), "focus_buff", player);
 					player.sendSystemMessage(Component.literal(
 						"\u00a77[Wanderers Haven]\u00a7r Focus faded."));
-					return true;
+					EFFECTS.clear(player.getUUID(), EFX_FOCUS);
 				}
-				return false;
-			})
-		);
+			}
+		});
+
+		// Dance of Falling Petals — pulse damage 2.5x/sec for 10 seconds
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			for (Map.Entry<UUID, TimedEffectTracker.Window> entry : EFFECTS.snapshot(EFX_FALLING_PETALS).entrySet()) {
+				ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
+				if (player == null) {
+					EFFECTS.clear(entry.getKey(), EFX_FALLING_PETALS);
+					continue;
+				}
+				long now = player.level().getGameTime();
+				if (now >= entry.getValue().expiresAt()) {
+					player.sendSystemMessage(Component.literal(
+						"\u00a77[Wanderers Haven]\u00a7r Dance of Falling Petals faded."));
+					EFFECTS.clear(player.getUUID(), EFX_FALLING_PETALS);
+					continue;
+				}
+				long elapsed = now - entry.getValue().startedAt();
+				if (elapsed % DANCE_OF_FALLING_PETALS_PULSE_INTERVAL_TICKS == 0L) {
+					danceOfFallingPetalsPulse(player);
+				}
+			}
+		});
+
+
+		// Dance of the Butterfly — expire movement speed buff and damage window
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			for (Map.Entry<UUID, TimedEffectTracker.Window> entry : EFFECTS.snapshot(EFX_BUTTERFLY).entrySet()) {
+				ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
+				if (player == null) {
+					ClassSystemBootstrap.statEngine().deactivateSource(entry.getKey(), "dance_of_butterfly_buff", null);
+					danceOfTheButterflyHitEntities.remove(entry.getKey());
+					EFFECTS.clear(entry.getKey(), EFX_BUTTERFLY);
+					continue;
+				}
+				if (player.level().getGameTime() >= entry.getValue().expiresAt()) {
+					ClassSystemBootstrap.statEngine().deactivateSource(player.getUUID(), "dance_of_butterfly_buff", player);
+					danceOfTheButterflyHitEntities.remove(player.getUUID());
+					player.sendSystemMessage(Component.literal(
+						"\u00a77[Wanderers Haven]\u00a7r Dance of the Butterfly faded."));
+					EFFECTS.clear(player.getUUID(), EFX_BUTTERFLY);
+					continue;
+				}
+				danceOfTheButterflyTickDamage(player);
+			}
+		});
 
 		// Stand Your Ground — expire hit stacks after 15 seconds of no damage
 		ServerTickEvents.END_SERVER_TICK.register(server -> {
 			for (ServerPlayer player : server.getPlayerList().getPlayers()) {
 				if (!ClassSystemBootstrap.skillEngine()
 						.ownedSkillIds(player.getUUID(), "warrior")
-						.contains("warrior_vanguard_stand_your_ground")) continue;
+						.contains("stand_your_ground")) continue;
 				Long lastHit = sygLastHitAt.get(player.getUUID());
 				if (lastHit == null) continue;
 				if (player.level().getGameTime() - lastHit >= STAND_YOUR_GROUND_WINDOW_TICKS) {
@@ -299,6 +328,29 @@ public final class SkillEffectService {
 		ClassSystemBootstrap.statEngine().applyAll(player);
 	}
 
+	public static void executeActiveSkill(ServerPlayer player, String skillId) {
+		ACTIVE_SKILLS.execute(player, skillId);
+	}
+
+	private static ActiveSkillRegistry buildActiveSkillRegistry() {
+		ActiveSkillRegistry registry = new ActiveSkillRegistry();
+		registry.register("heavy_strikes", SkillEffectService::executeHeavyStrikes);
+		registry.register("battle_cry_weak", SkillEffectService::executeBattleCryWeak);
+		registry.register("bludgeon", SkillEffectService::executeBludgeon);
+		registry.register("piercing_charge", SkillEffectService::executePiercingCharge);
+		registry.register("fury_unleashed", SkillEffectService::executeFuryUnleashed);
+		registry.register("smite", SkillEffectService::executeSmite);
+		registry.register("shield_bash", SkillEffectService::executeShieldBash);
+		registry.register("parry", SkillEffectService::executeParry);
+		registry.register("flash_step", SkillEffectService::executeFlashStep);
+		registry.register("dance_of_falling_petals", SkillEffectService::executeDanceOfFallingPetals);
+		registry.register("harmony_of_pain", SkillEffectService::executeHarmonyOfPain);
+		registry.register("dance_of_the_butterfly", SkillEffectService::executeDanceOfTheButterfly);
+		registry.register("circular_slash", SkillEffectService::executeCircularSlash);
+		registry.register("focus", SkillEffectService::executeFocus);
+		return registry;
+	}
+
 	// ── Mixin helpers ─────────────────────────────────────────────────────────
 
 	/**
@@ -308,29 +360,26 @@ public final class SkillEffectService {
 	public static float getDamageMultiplier(ServerPlayer player, DamageSource source) {
 		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
 		float mult = 1.0f;
-		if      (skills.contains("warrior_iron_skin"))          mult *= 0.88f;
-		else if (skills.contains("warrior_tough_skin"))         mult *= 0.95f;
+		if      (skills.contains("iron_skin"))          mult *= 0.88f;
+		else if (skills.contains("tough_skin"))         mult *= 0.95f;
 		if (source != null
 				&& source.getDirectEntity() instanceof AbstractArrow
-				&& skills.contains("warrior_iron_skin")) {
+				&& skills.contains("iron_skin")) {
 			mult *= 0.90f;
 		}
-		if      (skills.contains("warrior_enhanced_endurance")) mult *= 0.82f;
-		else if (skills.contains("warrior_lesser_endurance"))   mult *= 0.90f;
+		if      (skills.contains("enhanced_endurance")) mult *= 0.82f;
+		else if (skills.contains("lesser_endurance"))   mult *= 0.90f;
 		// Fighting Spirit — 50% DR during active window
-		if (skills.contains("warrior_berserker_fighting_spirit")) {
-			Long activatedAt = fightingSpiritActivatedAt.get(player.getUUID());
-			if (activatedAt != null
-					&& player.level().getGameTime() - activatedAt < FIGHTING_SPIRIT_DURATION_TICKS) {
-				mult *= 0.50f;
-			}
+		if (skills.contains("fighting_spirit")
+				&& EFFECTS.isActive(player.getUUID(), EFX_FIGHTING_SPIRIT, player.level().getGameTime())) {
+			mult *= 0.50f;
 		}
 		// Aura of Righteousness — 15% DR while a paladin is within 17 blocks
 		if (hasPaladinAuraNearby(player)) {
 			mult *= 0.85f;
 		}
 		// Stand Your Ground — up to 60% DR from stacked hits within the 15-sec window
-		if (skills.contains("warrior_vanguard_stand_your_ground")) {
+		if (skills.contains("stand_your_ground")) {
 			int stacks = getSygStacks(player);
 			if (stacks > 0) {
 				mult *= (1.0f - Math.min(stacks * 0.05f, 0.60f));
@@ -342,25 +391,24 @@ public final class SkillEffectService {
 	/** True if the player has Tough Skin or Iron Skin (cactus immunity). */
 	public static boolean hasCactusImmunity(ServerPlayer player) {
 		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
-		return skills.contains("warrior_tough_skin") || skills.contains("warrior_iron_skin");
+		return skills.contains("tough_skin") || skills.contains("iron_skin");
 	}
 
 	/** Returns true and starts the 10-minute cooldown if Lucky Dodge fires. */
 	public static boolean tryLuckyDodge(ServerPlayer player) {
 		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
-		if (!skills.contains("warrior_lucky_dodge")) return false;
+		if (!skills.contains("lucky_dodge") ) return false;
 		long now = player.level().getGameTime();
-		Long last = luckyDodgeCooldowns.get(player.getUUID());
-		if (last != null && now - last < LUCKY_DODGE_COOLDOWN_TICKS) return false;
-		luckyDodgeCooldowns.put(player.getUUID(), now);
+		if (!COOLDOWNS.isReady(player.getUUID(), "lucky_dodge", now, LUCKY_DODGE_COOLDOWN_TICKS)) return false;
+		COOLDOWNS.start(player.getUUID(), "lucky_dodge", now);
 		return true;
 	}
 
 	/** Duration multiplier for poison effects (0.80 for Lesser, 0.90 for Minor, 1.0 otherwise). */
 	public static float getPoisonDurationMultiplier(ServerPlayer player) {
 		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
-		if (skills.contains("warrior_lesser_poison_resistance")) return 0.80f;
-		if (skills.contains("warrior_minor_poison_resistance"))  return 0.90f;
+		if (skills.contains("lesser_poison_resistance")) return 0.80f;
+		if (skills.contains("minor_poison_resistance"))  return 0.90f;
 		return 1.0f;
 	}
 
@@ -368,23 +416,21 @@ public final class SkillEffectService {
 	public static boolean hasSlowMetabolism(ServerPlayer player) {
 		return ClassSystemBootstrap.skillEngine()
 			.ownedSkillIds(player.getUUID(), "warrior")
-			.contains("warrior_slow_metabolism");
+			.contains("slow_metabolism");
 	}
 
 	// ── Second Wind ───────────────────────────────────────────────────────────
 
 	private static void trySecondWind(ServerPlayer player) {
 		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
-		boolean hasLesser = skills.contains("warrior_second_wind_lesser");
-		boolean hasMinor  = skills.contains("warrior_second_wind_minor");
+		boolean hasLesser = skills.contains("second_wind_lesser");
+		boolean hasMinor  = skills.contains("second_wind_minor");
 		if (!hasLesser && !hasMinor) return;
 
 		long now = player.level().getGameTime();
-		Long last = secondWindCooldowns.get(player.getUUID());
 		long cooldown = hasLesser ? SECOND_WIND_LESSER_COOLDOWN_TICKS : SECOND_WIND_MINOR_COOLDOWN_TICKS;
-		if (last != null && now - last < cooldown) return;
-
-		secondWindCooldowns.put(player.getUUID(), now);
+		if (!COOLDOWNS.isReady(player.getUUID(), "second_wind", now, cooldown)) return;
+		COOLDOWNS.start(player.getUUID(), "second_wind", now);
 		if (hasLesser) {
 			player.heal(9.0f);
 			player.sendSystemMessage(Component.literal(
@@ -400,23 +446,22 @@ public final class SkillEffectService {
 
 	private static void tryActivateLastStand(ServerPlayer player) {
 		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
-		boolean hasLesser = skills.contains("warrior_last_stand_lesser");
-		boolean hasMinor  = skills.contains("warrior_last_stand_minor");
+		boolean hasLesser = skills.contains("last_stand_lesser");
+		boolean hasMinor  = skills.contains("last_stand_minor");
 		if (!hasLesser && !hasMinor) return;
-		if (lastStandActivatedAt.containsKey(player.getUUID())) return;
+		if (EFFECTS.isActive(player.getUUID(), EFX_LAST_STAND, player.level().getGameTime())) return;
 
 		long now = player.level().getGameTime();
-		Long last = lastStandCooldowns.get(player.getUUID());
 		long cooldown = hasLesser ? LAST_STAND_LESSER_COOLDOWN_TICKS : LAST_STAND_MINOR_COOLDOWN_TICKS;
-		if (last != null && now - last < cooldown) return;
+		if (!COOLDOWNS.isReady(player.getUUID(), "last_stand", now, cooldown)) return;
 
 		activateLastStand(player, hasLesser);
 	}
 
 	private static void activateLastStand(ServerPlayer player, boolean lesser) {
 		long now = player.level().getGameTime();
-		lastStandActivatedAt.put(player.getUUID(), now);
-		lastStandCooldowns.put(player.getUUID(), now);
+		EFFECTS.start(player.getUUID(), EFX_LAST_STAND, now, LAST_STAND_DURATION_TICKS);
+		COOLDOWNS.start(player.getUUID(), "last_stand", now);
 		double boost = lesser ? 0.12 : 0.08;
 		ClassSystemBootstrap.statEngine().setBuffAmount(player.getUUID(), "last_stand_buff", boost);
 		ClassSystemBootstrap.statEngine().activateSource(player.getUUID(), "last_stand_buff");
@@ -435,16 +480,15 @@ public final class SkillEffectService {
 
 	public static void executeHeavyStrikes(ServerPlayer player) {
 		long now = player.level().getGameTime();
-		Long last = heavyStrikesCooldowns.get(player.getUUID());
-		if (last != null && now - last < HEAVY_STRIKES_COOLDOWN_TICKS) {
-			long remaining = HEAVY_STRIKES_COOLDOWN_TICKS - (now - last);
+		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "heavy_strikes", now, HEAVY_STRIKES_COOLDOWN_TICKS);
+		if (remaining > 0L) {
 			player.sendSystemMessage(Component.literal(
 				"\u00a77[Wanderers Haven]\u00a7r Heavy Strikes is on cooldown (" + (remaining / 20) + "s remaining)."));
 			return;
 		}
-		if (heavyStrikesActivatedAt.containsKey(player.getUUID())) return;
-		heavyStrikesActivatedAt.put(player.getUUID(), now);
-		heavyStrikesCooldowns.put(player.getUUID(), now);
+		if (EFFECTS.isActive(player.getUUID(), EFX_HEAVY_STRIKES, now)) return;
+		EFFECTS.start(player.getUUID(), EFX_HEAVY_STRIKES, now, HEAVY_STRIKES_DURATION_TICKS);
+		COOLDOWNS.start(player.getUUID(), "heavy_strikes", now);
 		ClassSystemBootstrap.statEngine().activateSource(player.getUUID(), "heavy_strikes_buff");
 		player.sendSystemMessage(Component.literal(
 			"\u00a7c[Wanderers Haven]\u00a7r Heavy Strikes! +12% damage for 10 seconds. (30 sec cooldown)"));
@@ -460,14 +504,13 @@ public final class SkillEffectService {
 
 	public static void executeBattleCryWeak(ServerPlayer player) {
 		long now = player.level().getGameTime();
-		Long last = battleCryWeakCooldowns.get(player.getUUID());
-		if (last != null && now - last < BATTLE_CRY_WEAK_COOLDOWN_TICKS) {
-			long remaining = BATTLE_CRY_WEAK_COOLDOWN_TICKS - (now - last);
+		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "battle_cry_weak", now, BATTLE_CRY_WEAK_COOLDOWN_TICKS);
+		if (remaining > 0L) {
 			player.sendSystemMessage(Component.literal(
 				"\u00a77[Wanderers Haven]\u00a7r Battle Cry is on cooldown (" + (remaining / 20) + "s remaining)."));
 			return;
 		}
-		battleCryWeakCooldowns.put(player.getUUID(), now);
+		COOLDOWNS.start(player.getUUID(), "battle_cry_weak", now);
 		long expiresAt = now + BATTLE_CRY_WEAK_DURATION_TICKS;
 
 		ServerLevel serverLevel = (ServerLevel) player.level();
@@ -475,18 +518,14 @@ public final class SkillEffectService {
 		serverLevel.sendParticles(ParticleTypes.ANGRY_VILLAGER, px, py, pz, 40, 1.5, 0.8, 1.5, 0.4);
 		serverLevel.sendParticles(ParticleTypes.CRIT,           px, py, pz, 25, 1.5, 0.8, 1.5, 0.6);
 
-		List<LivingEntity> nearby = player.level().getEntitiesOfClass(
-			LivingEntity.class,
-			player.getBoundingBox().inflate(3.5),
-			e -> e != player && (e instanceof Enemy || (e instanceof Player && e != player))
-		);
+		List<LivingEntity> nearby = nearbyEnemies(player, 3.5);
 		if (nearby.isEmpty()) {
 			player.sendSystemMessage(Component.literal(
 				"\u00a77[Wanderers Haven]\u00a7r Battle Cry! No enemies within range."));
 			return;
 		}
 		for (LivingEntity enemy : nearby) {
-			battleCryDebuffedEntities.put(enemy.getUUID(), expiresAt);
+			COMBAT_DEBUFFS.apply(enemy.getUUID(), expiresAt, 0.92f, 1.08f);
 		}
 		int count = nearby.size();
 		player.sendSystemMessage(Component.literal(
@@ -494,41 +533,73 @@ public final class SkillEffectService {
 			" weakened for 8 seconds. (45 sec cooldown)"));
 	}
 
+	// -- Harmony of Pain (Blade Dancer upgrade) --------------------------------
+
+	public static void executeHarmonyOfPain(ServerPlayer player) {
+		long now = player.level().getGameTime();
+		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "harmony_of_pain", now, HARMONY_OF_PAIN_COOLDOWN_TICKS);
+		if (remaining > 0L) {
+			player.sendSystemMessage(Component.literal(
+				"\u00a77[Wanderers Haven]\u00a7r Harmony of Pain is on cooldown (" + (remaining / 20) + "s remaining)."));
+			return;
+		}
+		COOLDOWNS.start(player.getUUID(), "harmony_of_pain", now);
+		long expiresAt = now + HARMONY_OF_PAIN_DURATION_TICKS;
+
+		ServerLevel serverLevel = (ServerLevel) player.level();
+		double px = player.getX(), py = player.getY() + 1.0, pz = player.getZ();
+		serverLevel.sendParticles(ParticleTypes.SWEEP_ATTACK, px, py, pz, 35, 1.4, 0.7, 1.4, 0.2);
+		serverLevel.sendParticles(ParticleTypes.CRIT,         px, py, pz, 25, 1.4, 0.7, 1.4, 0.5);
+
+		List<LivingEntity> nearby = nearbyEnemies(player, 5.0);
+		if (nearby.isEmpty()) {
+			player.sendSystemMessage(Component.literal(
+				"\u00a77[Wanderers Haven]\u00a7r Harmony of Pain! No enemies within range."));
+			return;
+		}
+
+		for (LivingEntity enemy : nearby) {
+			COMBAT_DEBUFFS.apply(enemy.getUUID(), expiresAt, 0.90f, 1.10f);
+			ATTRIBUTE_DEBUFFS.apply(
+				enemy,
+				Attributes.MOVEMENT_SPEED,
+				HARMONY_PAIN_SLOW_MOD,
+				-0.40,
+				AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				expiresAt
+			);
+		}
+
+		int count = nearby.size();
+		player.sendSystemMessage(Component.literal(
+			"\u00a7d[Wanderers Haven]\u00a7r Harmony of Pain! " + count + " enem" + (count == 1 ? "y" : "ies") +
+			" afflicted for 10 seconds. (45 sec cooldown)"));
+	}
+
 	/** Returns 0.92f if the attacker is Battle Cry debuffed (8% less damage dealt). */
 	public static float getBattleCryAttackerMult(UUID attackerUUID, long gameTime) {
-		Long expiresAt = battleCryDebuffedEntities.get(attackerUUID);
-		if (expiresAt == null) return 1.0f;
-		if (gameTime >= expiresAt) { battleCryDebuffedEntities.remove(attackerUUID); return 1.0f; }
-		return 0.92f;
+		return COMBAT_DEBUFFS.dealtMult(attackerUUID, gameTime);
 	}
 
 	/** Returns 1.08f if the target is Battle Cry debuffed (8% more damage taken). */
 	public static float getBattleCryTargetMult(UUID targetUUID, long gameTime) {
-		Long expiresAt = battleCryDebuffedEntities.get(targetUUID);
-		if (expiresAt == null) return 1.0f;
-		if (gameTime >= expiresAt) { battleCryDebuffedEntities.remove(targetUUID); return 1.0f; }
-		return 1.08f;
+		return COMBAT_DEBUFFS.takenMult(targetUUID, gameTime);
 	}
 
 	// ── Bludgeon (active) ─────────────────────────────────────────────────────
 
 	public static void executeBludgeon(ServerPlayer player) {
 		long now = player.level().getGameTime();
-		Long last = bludgeonCooldowns.get(player.getUUID());
-		if (last != null && now - last < BLUDGEON_COOLDOWN_TICKS) {
-			long remaining = BLUDGEON_COOLDOWN_TICKS - (now - last);
+		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "bludgeon", now, BLUDGEON_COOLDOWN_TICKS);
+		if (remaining > 0L) {
 			player.sendSystemMessage(Component.literal(
 				"\u00a77[Wanderers Haven]\u00a7r Bludgeon is on cooldown (" + (remaining / 20) + "s remaining)."));
 			return;
 		}
-		bludgeonCooldowns.put(player.getUUID(), now);
-		ServerPlayNetworking.send(player, new PlaySkillAnimationPayload("warrior_bludgeon"));
+		COOLDOWNS.start(player.getUUID(), "bludgeon", now);
+		ServerPlayNetworking.send(player, new PlaySkillAnimationPayload("bludgeon"));
 
-		List<LivingEntity> targets = player.level().getEntitiesOfClass(
-			LivingEntity.class,
-			player.getBoundingBox().inflate(3.5),
-			e -> e != player && isInFrontCone(player, e, 3.5, 0.5)
-		);
+		List<LivingEntity> targets = coneEnemies(player, 3.5, 0.5);
 		if (targets.isEmpty()) {
 			player.sendSystemMessage(Component.literal(
 				"\u00a77[Wanderers Haven]\u00a7r Bludgeon! No targets in range."));
@@ -539,13 +610,14 @@ public final class SkillEffectService {
 		int hit = 0;
 		for (LivingEntity target : targets) {
 			target.hurt(player.damageSources().playerAttack(player), weaponDamage);
-			AttributeInstance armorInst = target.getAttribute(Attributes.ARMOR);
-			if (armorInst != null) {
-				armorInst.removeModifier(BLUDGEON_ARMOR_MOD);
-				armorInst.addTransientModifier(
-					new AttributeModifier(BLUDGEON_ARMOR_MOD, -0.15, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
-				bludgeonedEntities.put(target.getUUID(), expiresAt);
-			}
+			ATTRIBUTE_DEBUFFS.apply(
+				target,
+				Attributes.ARMOR,
+				BLUDGEON_ARMOR_MOD,
+				-0.15,
+				AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				expiresAt
+			);
 			hit++;
 		}
 		player.sendSystemMessage(Component.literal(
@@ -557,21 +629,17 @@ public final class SkillEffectService {
 
 	public static void executePiercingCharge(ServerPlayer player) {
 		long now = player.level().getGameTime();
-		Long last = piercingChargeCooldowns.get(player.getUUID());
-		if (last != null && now - last < PIERCING_CHARGE_COOLDOWN_TICKS) {
-			long remaining = PIERCING_CHARGE_COOLDOWN_TICKS - (now - last);
+		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "piercing_charge", now, PIERCING_CHARGE_COOLDOWN_TICKS);
+		if (remaining > 0L) {
 			player.sendSystemMessage(Component.literal(
 				"\u00a77[Wanderers Haven]\u00a7r Piercing Charge is on cooldown (" + (remaining / 20) + "s remaining)."));
 			return;
 		}
-		piercingChargeCooldowns.put(player.getUUID(), now);
+		COOLDOWNS.start(player.getUUID(), "piercing_charge", now);
 		Vec3 look = player.getLookAngle();
 		Vec3 startPos = player.position();
 		Vec3 endPos = startPos.add(look.scale(5.0));
-		AABB dashBox = new AABB(
-			Math.min(startPos.x, endPos.x) - 0.6, startPos.y - 0.1, Math.min(startPos.z, endPos.z) - 0.6,
-			Math.max(startPos.x, endPos.x) + 0.6, startPos.y + 2.1, Math.max(startPos.z, endPos.z) + 0.6
-		);
+		AABB dashBox = pathBox(startPos, endPos, 0.6);
 		List<LivingEntity> inPath = player.level().getEntitiesOfClass(
 			LivingEntity.class, dashBox, e -> e != player);
 		float weaponDamage = (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE) * 1.3f;
@@ -588,19 +656,87 @@ public final class SkillEffectService {
 			" (20 sec cooldown)"));
 	}
 
+	// -- Dance of Falling Petals (Blade Dancer capstone) -----------------------
+
+	public static void executeDanceOfFallingPetals(ServerPlayer player) {
+		long now = player.level().getGameTime();
+		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "falling_petals", now, DANCE_OF_FALLING_PETALS_COOLDOWN_TICKS);
+		if (remaining > 0L) {
+			player.sendSystemMessage(Component.literal(
+				"\u00a77[Wanderers Haven]\u00a7r Dance of Falling Petals is on cooldown (" + (remaining / 20) + "s remaining)."));
+			return;
+		}
+		if (EFFECTS.isActive(player.getUUID(), EFX_FALLING_PETALS, now)) {
+			player.sendSystemMessage(Component.literal(
+				"\u00a77[Wanderers Haven]\u00a7r Dance of Falling Petals is already active."));
+			return;
+		}
+		COOLDOWNS.start(player.getUUID(), "falling_petals", now);
+		EFFECTS.start(player.getUUID(), EFX_FALLING_PETALS, now, DANCE_OF_FALLING_PETALS_DURATION_TICKS);
+		player.sendSystemMessage(Component.literal(
+			"\u00a7d[Wanderers Haven]\u00a7r Dance of Falling Petals! Blade storm active for 10 seconds. (30 sec cooldown)"));
+	}
+
+	private static void danceOfFallingPetalsPulse(ServerPlayer player) {
+		float pulseDamage = (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE) * 0.4f;
+		List<LivingEntity> targets = nearbyEnemies(player, 5.0);
+		for (LivingEntity target : targets) {
+			target.hurt(player.damageSources().playerAttack(player), pulseDamage);
+		}
+		if (!targets.isEmpty() && player.level() instanceof ServerLevel serverLevel) {
+			serverLevel.sendParticles(ParticleTypes.SWEEP_ATTACK,
+				player.getX(), player.getY() + 1.0, player.getZ(),
+				10, 0.8, 0.4, 0.8, 0.02);
+		}
+	}
+
+	// -- Dance of the Butterfly (Blade Dancer upgrade) -------------------------
+
+	public static void executeDanceOfTheButterfly(ServerPlayer player) {
+		long now = player.level().getGameTime();
+		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "dance_of_butterfly", now, DANCE_OF_THE_BUTTERFLY_COOLDOWN_TICKS);
+		if (remaining > 0L) {
+			player.sendSystemMessage(Component.literal(
+				"\u00a77[Wanderers Haven]\u00a7r Dance of the Butterfly is on cooldown (" + (remaining / 20) + "s remaining)."));
+			return;
+		}
+		if (EFFECTS.isActive(player.getUUID(), EFX_BUTTERFLY, now)) {
+			player.sendSystemMessage(Component.literal(
+				"\u00a77[Wanderers Haven]\u00a7r Dance of the Butterfly is already active."));
+			return;
+		}
+		COOLDOWNS.start(player.getUUID(), "dance_of_butterfly", now);
+		EFFECTS.start(player.getUUID(), EFX_BUTTERFLY, now, DANCE_OF_THE_BUTTERFLY_DURATION_TICKS);
+		danceOfTheButterflyHitEntities.put(player.getUUID(), ConcurrentHashMap.newKeySet());
+		ClassSystemBootstrap.statEngine().activateSource(player.getUUID(), "dance_of_butterfly_buff");
+		player.sendSystemMessage(Component.literal(
+			"\u00a7d[Wanderers Haven]\u00a7r Dance of the Butterfly! +50% speed for 5 seconds. (20 sec cooldown)"));
+	}
+
+	private static void danceOfTheButterflyTickDamage(ServerPlayer player) {
+		Set<UUID> hitSet = danceOfTheButterflyHitEntities.computeIfAbsent(
+			player.getUUID(),
+			id -> ConcurrentHashMap.newKeySet()
+		);
+		float damage = (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE) * 1.5f;
+		List<LivingEntity> touched = nearbyEnemies(player, 0.8);
+		for (LivingEntity target : touched) {
+			if (!hitSet.add(target.getUUID())) continue;
+			target.hurt(player.damageSources().playerAttack(player), damage);
+		}
+	}
+
 	// ── Fighting Spirit (passive — triggers at ≤40% HP) ──────────────────────
 
 	private static void tryFightingSpirit(ServerPlayer player) {
 		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
-		if (!skills.contains("warrior_berserker_fighting_spirit")) return;
-		if (fightingSpiritActivatedAt.containsKey(player.getUUID())) return;
-
+		if (!skills.contains("fighting_spirit")) return;
 		long now  = player.level().getGameTime();
-		Long last = fightingSpiritCooldowns.get(player.getUUID());
-		if (last != null && now - last < FIGHTING_SPIRIT_COOLDOWN_TICKS) return;
+		if (EFFECTS.isActive(player.getUUID(), EFX_FIGHTING_SPIRIT, now)) return;
 
-		fightingSpiritCooldowns.put(player.getUUID(), now);
-		fightingSpiritActivatedAt.put(player.getUUID(), now);
+		if (!COOLDOWNS.isReady(player.getUUID(), "fighting_spirit", now, FIGHTING_SPIRIT_COOLDOWN_TICKS)) return;
+		COOLDOWNS.start(player.getUUID(), "fighting_spirit", now);
+		EFFECTS.start(player.getUUID(), EFX_FIGHTING_SPIRIT, now, FIGHTING_SPIRIT_DURATION_TICKS);
 		player.sendSystemMessage(Component.literal(
 			"\u00a7c[Wanderers Haven]\u00a7r Fighting Spirit! 50% damage resistance for 30 seconds. (5 min cooldown)"));
 	}
@@ -609,7 +745,7 @@ public final class SkillEffectService {
 
 	private static void accumulateFury(ServerPlayer player, float damageTaken) {
 		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
-		if (!skills.contains("warrior_berserker_fury_unleashed")) return;
+		if (!skills.contains("fury_unleashed")) return;
 		float current = furyPoints.getOrDefault(player.getUUID(), 0.0f);
 		furyPoints.put(player.getUUID(), Math.min(100.0f, current + damageTaken));
 	}
@@ -620,14 +756,13 @@ public final class SkillEffectService {
 
 	public static void executeFuryUnleashed(ServerPlayer player) {
 		long now  = player.level().getGameTime();
-		Long last = furyUnleashedCooldowns.get(player.getUUID());
-		if (last != null && now - last < FURY_UNLEASHED_COOLDOWN_TICKS) {
-			long remaining = FURY_UNLEASHED_COOLDOWN_TICKS - (now - last);
+		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "fury_unleashed", now, FURY_UNLEASHED_COOLDOWN_TICKS);
+		if (remaining > 0L) {
 			player.sendSystemMessage(Component.literal(
 				"\u00a77[Wanderers Haven]\u00a7r Fury Unleashed is on cooldown (" + (remaining / 20) + "s remaining)."));
 			return;
 		}
-		if (furyUnleashedActivatedAt.containsKey(player.getUUID())) {
+		if (EFFECTS.isActive(player.getUUID(), EFX_FURY_UNLEASHED, now)) {
 			player.sendSystemMessage(Component.literal(
 				"\u00a77[Wanderers Haven]\u00a7r Fury Unleashed is already active."));
 			return;
@@ -639,8 +774,8 @@ public final class SkillEffectService {
 			return;
 		}
 		furyPoints.put(player.getUUID(), 0.0f);
-		furyUnleashedCooldowns.put(player.getUUID(), now);
-		furyUnleashedActivatedAt.put(player.getUUID(), now);
+		COOLDOWNS.start(player.getUUID(), "fury_unleashed", now);
+		EFFECTS.start(player.getUUID(), EFX_FURY_UNLEASHED, now, FURY_UNLEASHED_DURATION_TICKS);
 		double bonus = fury * 0.01;
 		ClassSystemBootstrap.statEngine().setBuffAmount(player.getUUID(), "fury_unleashed_buff", bonus);
 		ClassSystemBootstrap.statEngine().activateSource(player.getUUID(), "fury_unleashed_buff");
@@ -660,21 +795,19 @@ public final class SkillEffectService {
 
 	public static void executeCircularSlash(ServerPlayer player) {
 		long now  = player.level().getGameTime();
-		Long last = circularSlashCooldowns.get(player.getUUID());
-		if (last != null && now - last < CIRCULAR_SLASH_COOLDOWN_TICKS) {
-			long remaining = CIRCULAR_SLASH_COOLDOWN_TICKS - (now - last);
+		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "circular_slash", now, CIRCULAR_SLASH_COOLDOWN_TICKS);
+		if (remaining > 0L) {
 			player.sendSystemMessage(Component.literal(
 				"\u00a77[Wanderers Haven]\u00a7r Circular Slash is on cooldown (" + (remaining / 20) + "s remaining)."));
 			return;
 		}
-		List<LivingEntity> targets = player.level().getEntitiesOfClass(
-			LivingEntity.class, player.getBoundingBox().inflate(4.0), e -> e != player);
+		List<LivingEntity> targets = nearbyEnemies(player, 4.0);
 		if (targets.isEmpty()) {
 			player.sendSystemMessage(Component.literal(
 				"\u00a77[Wanderers Haven]\u00a7r Circular Slash! No enemies in range."));
 			return;
 		}
-		circularSlashCooldowns.put(player.getUUID(), now);
+		COOLDOWNS.start(player.getUUID(), "circular_slash", now);
 		float damage = (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE) * 2.5f;
 		for (LivingEntity target : targets) {
 			target.hurt(player.damageSources().playerAttack(player), damage);
@@ -689,20 +822,19 @@ public final class SkillEffectService {
 
 	public static void executeFocus(ServerPlayer player) {
 		long now  = player.level().getGameTime();
-		Long last = focusCooldowns.get(player.getUUID());
-		if (last != null && now - last < FOCUS_COOLDOWN_TICKS) {
-			long remaining = FOCUS_COOLDOWN_TICKS - (now - last);
+		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "focus", now, FOCUS_COOLDOWN_TICKS);
+		if (remaining > 0L) {
 			player.sendSystemMessage(Component.literal(
 				"\u00a77[Wanderers Haven]\u00a7r Focus is on cooldown (" + (remaining / 20) + "s remaining)."));
 			return;
 		}
-		if (focusActivatedAt.containsKey(player.getUUID())) {
+		if (EFFECTS.isActive(player.getUUID(), EFX_FOCUS, now)) {
 			player.sendSystemMessage(Component.literal(
 				"\u00a77[Wanderers Haven]\u00a7r Focus is already active."));
 			return;
 		}
-		focusCooldowns.put(player.getUUID(), now);
-		focusActivatedAt.put(player.getUUID(), now);
+		COOLDOWNS.start(player.getUUID(), "focus", now);
+		EFFECTS.start(player.getUUID(), EFX_FOCUS, now, FOCUS_DURATION_TICKS);
 		ClassSystemBootstrap.statEngine().activateSource(player.getUUID(), "focus_buff");
 		player.sendSystemMessage(Component.literal(
 			"\u00a7c[Wanderers Haven]\u00a7r Focus! +20% damage and 60% dodge chance for 30 seconds. (2 min cooldown)"));
@@ -710,9 +842,7 @@ public final class SkillEffectService {
 
 	/** Returns true (cancelling the hit) if Focus is active and the 60% dodge roll succeeds. */
 	public static boolean tryFocusDodge(ServerPlayer player) {
-		Long activatedAt = focusActivatedAt.get(player.getUUID());
-		if (activatedAt == null) return false;
-		if (player.level().getGameTime() - activatedAt >= FOCUS_DURATION_TICKS) return false;
+		if (!EFFECTS.isActive(player.getUUID(), EFX_FOCUS, player.level().getGameTime())) return false;
 		if (player.level().random.nextFloat() >= 0.60f) return false;
 		player.sendSystemMessage(Component.literal(
 			"\u00a7e[Wanderers Haven]\u00a7r Focus dodged an attack!"));
@@ -722,7 +852,7 @@ public final class SkillEffectService {
 	// ── Parry (Duelist capstone — active counter-attack) ─────────────────────
 
 	public static void executeParry(ServerPlayer player) {
-		parryActivatedAt.put(player.getUUID(), player.level().getGameTime());
+		EFFECTS.start(player.getUUID(), EFX_PARRY_WINDOW, player.level().getGameTime(), PARRY_WINDOW_TICKS);
 		player.sendSystemMessage(Component.literal(
 			"\u00a7e[Wanderers Haven]\u00a7r Parry ready!"));
 	}
@@ -730,18 +860,17 @@ public final class SkillEffectService {
 	/** Called from the mixin. Returns true (cancelling damage) if parry fires and counter-attacks. */
 	public static boolean tryParry(ServerPlayer player) {
 		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
-		if (!skills.contains("warrior_duelist_parry")) return false;
-		Long activatedAt = parryActivatedAt.get(player.getUUID());
-		if (activatedAt == null) return false;
+		if (!skills.contains("parry")) return false;
+		TimedEffectTracker.Window window = EFFECTS.get(player.getUUID(), EFX_PARRY_WINDOW);
+		if (window == null) return false;
 		long now = player.level().getGameTime();
-		if (now - activatedAt > PARRY_WINDOW_TICKS) {
-			parryActivatedAt.remove(player.getUUID());
+		if (now >= window.expiresAt()) {
+			EFFECTS.clear(player.getUUID(), EFX_PARRY_WINDOW);
 			return false;
 		}
-		parryActivatedAt.remove(player.getUUID());
+		EFFECTS.clear(player.getUUID(), EFX_PARRY_WINDOW);
 		float counterDamage = (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE) * 1.5f;
-		List<LivingEntity> nearby = player.level().getEntitiesOfClass(
-			LivingEntity.class, player.getBoundingBox().inflate(2.0), e -> e != player);
+		List<LivingEntity> nearby = nearbyEnemies(player, 2.0);
 		for (LivingEntity enemy : nearby) {
 			enemy.hurt(player.damageSources().playerAttack(player), counterDamage);
 		}
@@ -756,9 +885,8 @@ public final class SkillEffectService {
 
 	public static void executeFlashStep(ServerPlayer player) {
 		long now  = player.level().getGameTime();
-		Long last = flashStepCooldowns.get(player.getUUID());
-		if (last != null && now - last < FLASH_STEP_COOLDOWN_TICKS) {
-			long remaining = FLASH_STEP_COOLDOWN_TICKS - (now - last);
+		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "flash_step", now, FLASH_STEP_COOLDOWN_TICKS);
+		if (remaining > 0L) {
 			player.sendSystemMessage(Component.literal(
 				"\u00a77[Wanderers Haven]\u00a7r Flash Step is on cooldown (" + (remaining / 20) + "s remaining)."));
 			return;
@@ -768,10 +896,7 @@ public final class SkillEffectService {
 		float damage = (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE) * 3.0f;
 
 		Vec3 start3d = player.position();
-		AABB dashBox = new AABB(
-			Math.min(start3d.x, dest.x) - 0.6, start3d.y - 0.1, Math.min(start3d.z, dest.z) - 0.6,
-			Math.max(start3d.x, dest.x) + 0.6, start3d.y + 2.1, Math.max(start3d.z, dest.z) + 0.6
-		);
+		AABB dashBox = pathBox(start3d, dest, 0.6);
 		List<LivingEntity> inPath = player.level().getEntitiesOfClass(
 			LivingEntity.class, dashBox, e -> e != player);
 		for (LivingEntity target : inPath) {
@@ -779,9 +904,9 @@ public final class SkillEffectService {
 		}
 
 		player.teleportTo(dest.x, dest.y, dest.z);
-		flashStepCooldowns.put(player.getUUID(), now);
+		COOLDOWNS.start(player.getUUID(), "flash_step", now);
 		ClassSystemBootstrap.statEngine().activateSource(player.getUUID(), "flash_step_buff");
-		flashStepSpeedExpiresAt.put(player.getUUID(), now + FLASH_STEP_SPEED_DURATION_TICKS);
+		EFFECTS.start(player.getUUID(), EFX_FLASH_STEP, now, FLASH_STEP_SPEED_DURATION_TICKS);
 
 		int n = inPath.size();
 		player.sendSystemMessage(Component.literal(
@@ -809,15 +934,14 @@ public final class SkillEffectService {
 	/** Called from the mixin. Returns true (cancelling the hit) if the auto-block fires. */
 	public static boolean tryShieldsProtectionBlock(ServerPlayer player) {
 		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
-		if (!skills.contains("warrior_vanguard_shields_protection")) return false;
+		if (!skills.contains("shields_protection")) return false;
 		boolean holdingShield =
 			player.getMainHandItem().getItem() instanceof net.minecraft.world.item.ShieldItem
 			|| player.getOffhandItem().getItem() instanceof net.minecraft.world.item.ShieldItem;
 		if (!holdingShield) return false;
 		long now  = player.level().getGameTime();
-		Long last = shieldsProtectionLastBlock.get(player.getUUID());
-		if (last != null && now - last < SHIELDS_PROTECTION_COOLDOWN_TICKS) return false;
-		shieldsProtectionLastBlock.put(player.getUUID(), now);
+		if (!COOLDOWNS.isReady(player.getUUID(), "shields_protection_block", now, SHIELDS_PROTECTION_COOLDOWN_TICKS)) return false;
+		COOLDOWNS.start(player.getUUID(), "shields_protection_block", now);
 		player.sendSystemMessage(Component.literal(
 			"\u00a7b[Wanderers Haven]\u00a7r Shield's Protection! Attack blocked automatically."));
 		return true;
@@ -835,37 +959,33 @@ public final class SkillEffectService {
 			return;
 		}
 		long now  = player.level().getGameTime();
-		Long last = shieldBashCooldowns.get(player.getUUID());
-		if (last != null && now - last < SHIELD_BASH_COOLDOWN_TICKS) {
-			long remaining = SHIELD_BASH_COOLDOWN_TICKS - (now - last);
+		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "shield_bash", now, SHIELD_BASH_COOLDOWN_TICKS);
+		if (remaining > 0L) {
 			player.sendSystemMessage(Component.literal(
 				"\u00a77[Wanderers Haven]\u00a7r Shield Bash is on cooldown (" + (remaining / 20) + "s remaining)."));
 			return;
 		}
-		List<LivingEntity> targets = player.level().getEntitiesOfClass(
-			LivingEntity.class,
-			player.getBoundingBox().inflate(3.5),
-			e -> e != player && isInFrontCone(player, e, 3.5, 0.5)
-		);
+		List<LivingEntity> targets = coneEnemies(player, 3.5, 0.5);
 		if (targets.isEmpty()) {
 			player.sendSystemMessage(Component.literal(
 				"\u00a77[Wanderers Haven]\u00a7r Shield Bash! No targets in range."));
 			return;
 		}
-		shieldBashCooldowns.put(player.getUUID(), now);
+		COOLDOWNS.start(player.getUUID(), "shield_bash", now);
 		long debuffExpiry = now + SHIELD_BASH_ARMOR_DEBUFF_TICKS;
 		Vec3 playerPos = player.position();
 		int hit = 0;
 		for (LivingEntity target : targets) {
 			Vec3 dir = target.position().subtract(playerPos).normalize();
 			target.knockback(2.0, -dir.x, -dir.z);
-			AttributeInstance armorInst = target.getAttribute(Attributes.ARMOR);
-			if (armorInst != null) {
-				armorInst.removeModifier(SHIELD_BASH_ARMOR_MOD);
-				armorInst.addTransientModifier(new AttributeModifier(
-					SHIELD_BASH_ARMOR_MOD, -0.25, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
-				bludgeonedEntities.put(target.getUUID(), debuffExpiry);
-			}
+			ATTRIBUTE_DEBUFFS.apply(
+				target,
+				Attributes.ARMOR,
+				SHIELD_BASH_ARMOR_MOD,
+				-0.25,
+				AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				debuffExpiry
+			);
 			stunEntity(target, SHIELD_BASH_STUN_TICKS);
 			hit++;
 		}
@@ -879,7 +999,7 @@ public final class SkillEffectService {
 
 	private static void incrementSygStack(ServerPlayer player) {
 		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
-		if (!skills.contains("warrior_vanguard_stand_your_ground")) return;
+		if (!skills.contains("stand_your_ground")) return;
 		int current = sygStacks.getOrDefault(player.getUUID(), 0);
 		sygStacks.put(player.getUUID(), Math.min(current + 1, STAND_YOUR_GROUND_MAX_STACKS));
 		sygLastHitAt.put(player.getUUID(), player.level().getGameTime());
@@ -926,7 +1046,7 @@ public final class SkillEffectService {
 			player.getBoundingBox().inflate(17.0),
 			p -> ClassSystemBootstrap.skillEngine()
 				.ownedSkillIds(p.getUUID(), "warrior")
-				.contains("warrior_paladin_aura_of_righteousness")
+				.contains("aura_of_righteousness")
 		).isEmpty();
 	}
 
@@ -936,7 +1056,7 @@ public final class SkillEffectService {
 			target.getBoundingBox().inflate(17.0),
 			p -> ClassSystemBootstrap.skillEngine()
 				.ownedSkillIds(p.getUUID(), "warrior")
-				.contains("warrior_paladin_aura_of_righteousness")
+				.contains("aura_of_righteousness")
 		).isEmpty();
 		return paladinNearby ? 1.15f : 1.0f;
 	}
@@ -946,14 +1066,14 @@ public final class SkillEffectService {
 	public static float getBurningJusticeDamageMult(LivingEntity target, ServerPlayer attacker) {
 		if (!ClassSystemBootstrap.skillEngine()
 				.ownedSkillIds(attacker.getUUID(), "warrior")
-				.contains("warrior_paladin_burning_justice")) return 1.0f;
+				.contains("burning_justice")) return 1.0f;
 		return target.getType().is(EntityTypeTags.UNDEAD) ? 1.36f : 1.18f;
 	}
 
 	public static void applyBurningJusticeFireOnHit(LivingEntity target, ServerPlayer attacker) {
 		if (!ClassSystemBootstrap.skillEngine()
 				.ownedSkillIds(attacker.getUUID(), "warrior")
-				.contains("warrior_paladin_burning_justice")) return;
+				.contains("burning_justice")) return;
 		target.igniteForSeconds(5);
 	}
 
@@ -961,37 +1081,33 @@ public final class SkillEffectService {
 
 	public static void executeSmite(ServerPlayer player) {
 		long now  = player.level().getGameTime();
-		Long last = smiteCooldowns.get(player.getUUID());
-		if (last != null && now - last < SMITE_COOLDOWN_TICKS) {
-			long remaining = SMITE_COOLDOWN_TICKS - (now - last);
+		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "smite", now, SMITE_COOLDOWN_TICKS);
+		if (remaining > 0L) {
 			player.sendSystemMessage(Component.literal(
 				"\u00a77[Wanderers Haven]\u00a7r Smite is on cooldown (" + (remaining / 20) + "s remaining)."));
 			return;
 		}
-		List<LivingEntity> targets = player.level().getEntitiesOfClass(
-			LivingEntity.class,
-			player.getBoundingBox().inflate(3.5),
-			e -> e != player && isInFrontCone(player, e, 3.5, 0.5)
-		);
+		List<LivingEntity> targets = coneEnemies(player, 3.5, 0.5);
 		if (targets.isEmpty()) {
 			player.sendSystemMessage(Component.literal(
 				"\u00a7e[Wanderers Haven]\u00a7r Smite! No targets in range."));
 			return;
 		}
-		smiteCooldowns.put(player.getUUID(), now);
+		COOLDOWNS.start(player.getUUID(), "smite", now);
 		ServerLevel level    = (ServerLevel) player.level();
 		float   weaponDmg    = (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE);
 		long    debuffExpiry = now + BLUDGEON_DEBUFF_DURATION_TICKS;
 		for (LivingEntity target : targets) {
 			boolean isUndead = target.getType().is(EntityTypeTags.UNDEAD);
 			target.hurt(player.damageSources().playerAttack(player), weaponDmg * (isUndead ? 5.0f : 2.5f));
-			AttributeInstance armorInst = target.getAttribute(Attributes.ARMOR);
-			if (armorInst != null) {
-				armorInst.removeModifier(BLUDGEON_ARMOR_MOD);
-				armorInst.addTransientModifier(new AttributeModifier(
-					BLUDGEON_ARMOR_MOD, -0.15, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
-				bludgeonedEntities.put(target.getUUID(), debuffExpiry);
-			}
+			ATTRIBUTE_DEBUFFS.apply(
+				target,
+				Attributes.ARMOR,
+				BLUDGEON_ARMOR_MOD,
+				-0.15,
+				AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				debuffExpiry
+			);
 			target.addEffect(new MobEffectInstance(
 				MobEffects.BLINDNESS, (int) BLUDGEON_DEBUFF_DURATION_TICKS, 0));
 			LightningBolt bolt = new LightningBolt(EntityType.LIGHTNING_BOLT, level);
@@ -1012,5 +1128,28 @@ public final class SkillEffectService {
 		double dist = toEntity.length();
 		if (dist > maxDist || dist < 0.01) return false;
 		return player.getLookAngle().dot(toEntity.normalize()) >= minDot;
+	}
+
+	private static List<LivingEntity> nearbyEnemies(ServerPlayer player, double range) {
+		return player.level().getEntitiesOfClass(
+			LivingEntity.class,
+			player.getBoundingBox().inflate(range),
+			e -> e != player && (e instanceof Enemy || (e instanceof Player && e != player))
+		);
+	}
+
+	private static List<LivingEntity> coneEnemies(ServerPlayer player, double range, double minDot) {
+		return player.level().getEntitiesOfClass(
+			LivingEntity.class,
+			player.getBoundingBox().inflate(range),
+			e -> e != player && isInFrontCone(player, e, range, minDot)
+		);
+	}
+
+	private static AABB pathBox(Vec3 startPos, Vec3 endPos, double pad) {
+		return new AABB(
+			Math.min(startPos.x, endPos.x) - pad, startPos.y - 0.1, Math.min(startPos.z, endPos.z) - pad,
+			Math.max(startPos.x, endPos.x) + pad, startPos.y + 2.1, Math.max(startPos.z, endPos.z) + pad
+		);
 	}
 }

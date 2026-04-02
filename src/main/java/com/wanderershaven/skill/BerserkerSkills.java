@@ -22,7 +22,7 @@ public final class BerserkerSkills {
 	// Replaces the guaranteed skill roll that would otherwise fire at level 25.
 
 	private static final SkillDefinition BERSERKER_RAGE = skill(
-		"warrior_berserker_rage", 3,
+		"berserker_rage", 3,
 		"Berserker Rage",
 		"Your pain is your power. The lower your health, the more damage you deal — "
 			+ "up to 50% bonus damage when you are down to half a heart."
@@ -36,16 +36,16 @@ public final class BerserkerSkills {
 	 * Full chain: Second Wind (Minor) → Second Wind (Lesser) → Fighting Spirit.
 	 */
 	private static final SkillDefinition FIGHTING_SPIRIT = upgrade(
-		"warrior_berserker_fighting_spirit", 3,
+		"fighting_spirit", 3,
 		"Fighting Spirit",
 		"Adversity only makes you sharper. When you drop to 40% health, gain 50% damage resistance "
 			+ "for 30 seconds. (5 min cooldown)",
-		"warrior_second_wind_lesser"
+		"second_wind_lesser"
 	);
 
 	/** Dual passive/active: stores incoming damage as Fury, then burns it for size and power. */
 	private static final SkillDefinition FURY_UNLEASHED = activeSkill(
-		"warrior_berserker_fury_unleashed", 4,
+		"fury_unleashed", 4,
 		"Fury Unleashed",
 		"Passive: Every point of damage you take is stored as Fury (up to 100 points). "
 			+ "Active: Consume all stored Fury — for each point spent, gain 1% bonus damage and grow slightly "
@@ -75,14 +75,14 @@ public final class BerserkerSkills {
 	// ── Helpers ───────────────────────────────────────────────────────────────
 
 	private static SkillDefinition skill(String id, int powerLevel, String displayName, String description) {
-		return new SkillDefinition(id, CLASS, powerLevel, displayName, description, null, false);
+		return SkillDefs.passive(CLASS, id, powerLevel, displayName, description);
 	}
 
 	private static SkillDefinition activeSkill(String id, int powerLevel, String displayName, String description) {
-		return new SkillDefinition(id, CLASS, powerLevel, displayName, description, null, true);
+		return SkillDefs.active(CLASS, id, powerLevel, displayName, description);
 	}
 
 	private static SkillDefinition upgrade(String id, int powerLevel, String displayName, String description, String supersedesId) {
-		return new SkillDefinition(id, CLASS, powerLevel, displayName, description, supersedesId, false);
+		return SkillDefs.upgrade(CLASS, id, powerLevel, displayName, description, supersedesId);
 	}
 }

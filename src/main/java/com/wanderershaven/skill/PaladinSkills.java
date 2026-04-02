@@ -16,7 +16,7 @@ public final class PaladinSkills {
 	// ── Capstone ──────────────────────────────────────────────────────────────
 
 	private static final SkillDefinition AURA_OF_RIGHTEOUSNESS = skill(
-		"warrior_paladin_aura_of_righteousness", 3,
+		"aura_of_righteousness", 3,
 		"Aura of Righteousness",
 		"A holy light radiates from you at all times. All allies within 17 blocks take 15% less damage. "
 			+ "All enemies within that same radius take 15% more damage."
@@ -25,18 +25,18 @@ public final class PaladinSkills {
 	// ── Exclusive roll pool ───────────────────────────────────────────────────
 
 	private static final SkillDefinition BURNING_JUSTICE = skill(
-		"warrior_paladin_burning_justice", 3,
+		"burning_justice", 3,
 		"Burning Justice",
 		"Your strikes carry divine fire. Each hit sets the target ablaze and deals 18% bonus damage — "
 			+ "doubled against the undead."
 	);
 
 	private static final SkillDefinition SMITE = activeUpgrade(
-		"warrior_paladin_smite", 4,
+		"smite", 4,
 		"Smite",
 		"Call down righteous lightning on all enemies in a cone before you. Deals massive damage — "
 			+ "doubled against undead. Reduces armor by 15% and inflicts blindness for 5 seconds. (20 sec cooldown)",
-		"warrior_bludgeon"
+		"bludgeon"
 	);
 
 	private PaladinSkills() {}
@@ -54,10 +54,10 @@ public final class PaladinSkills {
 	// ── Helpers ───────────────────────────────────────────────────────────────
 
 	private static SkillDefinition skill(String id, int powerLevel, String displayName, String description) {
-		return new SkillDefinition(id, CLASS, powerLevel, displayName, description, null, false);
+		return SkillDefs.passive(CLASS, id, powerLevel, displayName, description);
 	}
 
 	private static SkillDefinition activeUpgrade(String id, int powerLevel, String displayName, String description, String supersedesId) {
-		return new SkillDefinition(id, CLASS, powerLevel, displayName, description, supersedesId, true);
+		return SkillDefs.activeUpgrade(CLASS, id, powerLevel, displayName, description, supersedesId);
 	}
 }

@@ -15,7 +15,7 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
  * apply/remove/update automatically based on condition predicates.
  *
  * Source naming convention:
- *   - Permanent skill:  the skill's own ID  (e.g. "warrior_lesser_strength")
+	 *   - Permanent skill:  the skill's own ID  (e.g. "lesser_strength")
  *   - Timed buff:       "<source>_buff"      (e.g. "heavy_strikes_buff")
  */
 public final class SkillStatTable {
@@ -26,69 +26,69 @@ public final class SkillStatTable {
 		// ── Permanent skill bonuses ────────────────────────────────────────────
 
 		// Lesser Strength / Enhanced Strength — Enhanced supersedes Lesser (distinct IDs, exclusive conditions)
-		engine.register("warrior_lesser_strength",
+		engine.register("lesser_strength",
 			StatContribution.always(Attributes.ATTACK_DAMAGE, id("lesser_strength"),
 				0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
-				p -> owns(p, "warrior_lesser_strength") && !owns(p, "warrior_enhanced_strength")));
+				p -> owns(p, "lesser_strength") && !owns(p, "enhanced_strength")));
 
-		engine.register("warrior_enhanced_strength",
+		engine.register("enhanced_strength",
 			StatContribution.always(Attributes.ATTACK_DAMAGE, id("enhanced_strength"),
 				0.20, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
-				p -> owns(p, "warrior_enhanced_strength")));
+				p -> owns(p, "enhanced_strength")));
 
 		// Lesser Dexterity / Enhanced Dexterity
-		engine.register("warrior_lesser_dexterity",
+		engine.register("lesser_dexterity",
 			StatContribution.always(Attributes.ATTACK_SPEED, id("lesser_dexterity"),
 				0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
-				p -> owns(p, "warrior_lesser_dexterity") && !owns(p, "warrior_enhanced_dexterity")));
+				p -> owns(p, "lesser_dexterity") && !owns(p, "enhanced_dexterity")));
 
-		engine.register("warrior_enhanced_dexterity",
+		engine.register("enhanced_dexterity",
 			StatContribution.always(Attributes.ATTACK_SPEED, id("enhanced_dexterity"),
 				0.18, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
-				p -> owns(p, "warrior_enhanced_dexterity")));
+				p -> owns(p, "enhanced_dexterity")));
 
 		// Lesser Speed / Enhanced Speed
-		engine.register("warrior_lesser_speed",
+		engine.register("lesser_speed",
 			StatContribution.always(Attributes.MOVEMENT_SPEED, id("lesser_speed"),
 				0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
-				p -> owns(p, "warrior_lesser_speed") && !owns(p, "warrior_enhanced_speed")));
+				p -> owns(p, "lesser_speed") && !owns(p, "enhanced_speed")));
 
-		engine.register("warrior_enhanced_speed",
+		engine.register("enhanced_speed",
 			StatContribution.always(Attributes.MOVEMENT_SPEED, id("enhanced_speed"),
 				0.18, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
-				p -> owns(p, "warrior_enhanced_speed")));
+				p -> owns(p, "enhanced_speed")));
 
 		// Stand Your Ground — permanent knockback immunity
-		engine.register("warrior_vanguard_stand_your_ground",
+		engine.register("stand_your_ground",
 			StatContribution.always(Attributes.KNOCKBACK_RESISTANCE, id("knockback_immunity"),
 				1.0, AttributeModifier.Operation.ADD_VALUE,
-				p -> owns(p, "warrior_vanguard_stand_your_ground")));
+				p -> owns(p, "stand_your_ground")));
 
 		// ── Dynamic (amount recalculated each tick) ────────────────────────────
 
 		// Berserker Rage — 0% bonus at full health → 50% at 1 HP
-		engine.register("warrior_berserker_rage",
+		engine.register("berserker_rage",
 			StatContribution.dynamic(Attributes.ATTACK_DAMAGE, id("berserker_rage"),
 				AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
 				SkillStatTable::berserkerRageAmount,
-				p -> owns(p, "warrior_berserker_rage")));
+				p -> owns(p, "berserker_rage")));
 
 		// ── Conditional (weapon-gated, rechecked each tick) ───────────────────
 
 		// Swift Blade (Duelist) — +20% attack speed while holding a light blade
-		engine.register("warrior_duelist_swift_blade",
+		engine.register("swift_blade",
 			StatContribution.always(Attributes.ATTACK_SPEED, id("swift_blade"),
 				0.20, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
-				p -> owns(p, "warrior_duelist_swift_blade") && isDuelistWeapon(p)));
+				p -> owns(p, "swift_blade") && isDuelistWeapon(p)));
 
 		// Blade Mastery (Blademaster) — +25% damage and +18% attack speed while holding a heavy blade
-		engine.register("warrior_blademaster_blade_mastery",
+		engine.register("blade_mastery",
 			StatContribution.always(Attributes.ATTACK_DAMAGE, id("blade_mastery_damage"),
 				0.25, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
-				p -> owns(p, "warrior_blademaster_blade_mastery") && isBlademasterWeapon(p)),
+				p -> owns(p, "blade_mastery") && isBlademasterWeapon(p)),
 			StatContribution.always(Attributes.ATTACK_SPEED, id("blade_mastery_speed"),
 				0.18, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
-				p -> owns(p, "warrior_blademaster_blade_mastery") && isBlademasterWeapon(p)));
+				p -> owns(p, "blade_mastery") && isBlademasterWeapon(p)));
 
 		// ── Timed buffs (activated / deactivated by SkillEffectService) ────────
 
@@ -131,6 +131,12 @@ public final class SkillStatTable {
 			StatContribution.always(Attributes.ATTACK_DAMAGE, id("focus_damage"),
 				0.20, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
 				p -> engine.isSourceActive(p.getUUID(), "focus_buff")));
+
+		// Dance of the Butterfly — +50% movement speed for 5 seconds
+		engine.register("dance_of_butterfly_buff",
+			StatContribution.always(Attributes.MOVEMENT_SPEED, id("dance_of_butterfly_speed"),
+				0.50, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> engine.isSourceActive(p.getUUID(), "dance_of_butterfly_buff")));
 	}
 
 	// ── Private helpers ────────────────────────────────────────────────────────

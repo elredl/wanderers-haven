@@ -230,19 +230,7 @@ public final class WanderersHavenNetworking {
 	 * Execute an active skill for the given player.
 	 */
 	private static void executeActiveSkill(ServerPlayer player, String skillId) {
-		switch (skillId) {
-			case "warrior_heavy_strikes"            -> SkillEffectService.executeHeavyStrikes(player);
-			case "warrior_battle_cry_weak"          -> SkillEffectService.executeBattleCryWeak(player);
-			case "warrior_bludgeon"                 -> SkillEffectService.executeBludgeon(player);
-			case "warrior_piercing_charge"          -> SkillEffectService.executePiercingCharge(player);
-			case "warrior_berserker_fury_unleashed" -> SkillEffectService.executeFuryUnleashed(player);
-			case "warrior_paladin_smite"            -> SkillEffectService.executeSmite(player);
-			case "warrior_vanguard_shield_bash"     -> SkillEffectService.executeShieldBash(player);
-			case "warrior_duelist_parry"            -> SkillEffectService.executeParry(player);
-			case "warrior_duelist_flash_step"       -> SkillEffectService.executeFlashStep(player);
-			case "warrior_blademaster_circular_slash" -> SkillEffectService.executeCircularSlash(player);
-			case "warrior_blademaster_focus"          -> SkillEffectService.executeFocus(player);
-		}
+		SkillEffectService.executeActiveSkill(player, skillId);
 	}
 
 	// -------------------------------------------------------------------------

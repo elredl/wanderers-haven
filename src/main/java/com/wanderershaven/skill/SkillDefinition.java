@@ -7,7 +7,7 @@ package com.wanderershaven.skill;
  * Actual gameplay effects (attribute modifiers, potion effects, etc.)
  * will be applied by a separate effect system keyed to the skill ID.
  *
- * @param id           unique identifier used to track ownership, e.g. "warrior_bloodlust"
+	 * @param id           unique identifier used to track ownership, e.g. "bloodlust"
  * @param classId      class this skill belongs to, e.g. "warrior"
  * @param powerLevel   strength tier 1–10 (1 = minor buff, 10 = world-altering)
  * @param displayName  human-readable name shown in chat and UI
