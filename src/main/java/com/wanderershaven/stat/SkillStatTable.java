@@ -90,6 +90,12 @@ public final class SkillStatTable {
 				0.18, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
 				p -> owns(p, "blade_mastery") && isBlademasterWeapon(p)));
 
+		// Crushing Blows (Mauler) — +40% damage while holding mauler weapons
+		engine.register("crushing_blows",
+			StatContribution.always(Attributes.ATTACK_DAMAGE, id("crushing_blows_damage"),
+				0.40, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "crushing_blows") && isMaulerWeapon(p)));
+
 		// ── Timed buffs (activated / deactivated by SkillEffectService) ────────
 
 		// Heavy Strikes — +12% damage for 10 seconds
@@ -137,6 +143,12 @@ public final class SkillStatTable {
 			StatContribution.always(Attributes.MOVEMENT_SPEED, id("dance_of_butterfly_speed"),
 				0.50, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
 				p -> engine.isSourceActive(p.getUUID(), "dance_of_butterfly_buff")));
+
+		// Shadow Step — +50% movement speed for 5 seconds
+		engine.register("shadow_step_buff",
+			StatContribution.always(Attributes.MOVEMENT_SPEED, id("shadow_step_speed"),
+				0.50, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> engine.isSourceActive(p.getUUID(), "shadow_step_buff")));
 	}
 
 	// ── Private helpers ────────────────────────────────────────────────────────
@@ -165,5 +177,9 @@ public final class SkillStatTable {
 
 	private static boolean isBlademasterWeapon(ServerPlayer player) {
 		return "blademaster".equals(WeaponCategoryResolver.resolveFromItem(player.getMainHandItem()));
+	}
+
+	private static boolean isMaulerWeapon(ServerPlayer player) {
+		return "mauler".equals(WeaponCategoryResolver.resolveFromItem(player.getMainHandItem()));
 	}
 }

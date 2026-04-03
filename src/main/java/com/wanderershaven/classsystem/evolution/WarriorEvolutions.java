@@ -6,6 +6,8 @@ import com.wanderershaven.skill.BerserkerSkills;
 import com.wanderershaven.skill.BladeDancerSkills;
 import com.wanderershaven.skill.BlademasterSkills;
 import com.wanderershaven.skill.DuelistSkills;
+import com.wanderershaven.skill.ExecutionerSkills;
+import com.wanderershaven.skill.MaulerSkills;
 import com.wanderershaven.skill.PaladinSkills;
 import com.wanderershaven.skill.VanguardSkills;
 import java.util.List;
@@ -193,6 +195,7 @@ public final class WarriorEvolutions {
 		)
 			.requires(EvolutionPrerequisite.classLevel(25))
 			.requires(EvolutionPrerequisite.killsWithWeapon("mauler", 200))
+			.skillSet(MaulerSkills.skillSet())
 			.build();
 	}
 
@@ -210,6 +213,7 @@ public final class WarriorEvolutions {
 		)
 			.requires(EvolutionPrerequisite.classLevel(25))
 			.requires(EvolutionPrerequisite.killsWithWeapon("scythe", 200))
+			.skillSet(ExecutionerSkills.skillSet())
 			.build();
 	}
 }

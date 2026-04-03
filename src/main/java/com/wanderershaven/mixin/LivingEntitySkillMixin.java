@@ -40,6 +40,9 @@ public abstract class LivingEntitySkillMixin {
 		amount *= SkillEffectService.getBattleCryTargetMult(selfId, level.getGameTime());
 
 		if ((Object) this instanceof ServerPlayer player) {
+			if (SkillEffectService.isShadowStepActive(player)) {
+				return false;
+			}
 			// Focus — 60% dodge chance while buff is active
 			if (SkillEffectService.tryFocusDodge(player)) {
 				return false;
@@ -65,19 +68,32 @@ public abstract class LivingEntitySkillMixin {
 			}
 			// Battle Cry (Weak) — debuffed attackers deal 8% less damage to this player
 			Entity attacker = source.getEntity();
+			ServerPlayer attackingPlayer = attacker instanceof ServerPlayer sp ? sp : null;
+			if (attackingPlayer != null) {
+				amount *= SkillEffectService.getOutgoingDamageMultiplier(attackingPlayer);
+			}
 			if (attacker != null) {
 				amount *= SkillEffectService.getBattleCryAttackerMult(attacker.getUUID(), level.getGameTime());
 			}
 			// Pre-application damage reduction (same mechanic as Projectile Protection)
 			float mult = SkillEffectService.getDamageMultiplier(player, source);
-			return original.call(level, source, amount * mult);
+			float finalAmount = amount * mult;
+			boolean applied = original.call(level, source, finalAmount);
+			if (attackingPlayer != null) {
+				SkillEffectService.applyReapLifeLifesteal(attackingPlayer, finalAmount, applied);
+			}
+			return applied;
 		}
 		// Aura of Righteousness — enemies within 17 blocks of a paladin take 15% more damage
 		amount *= SkillEffectService.getPaladinAuraEnemyMult((LivingEntity)(Object) this, level);
 		// Burning Justice — paladin's strikes deal 18% bonus damage (36% for undead) and ignite
 		if (source.getEntity() instanceof ServerPlayer attacker) {
+			amount *= SkillEffectService.getOutgoingDamageMultiplier(attacker);
 			amount *= SkillEffectService.getBurningJusticeDamageMult((LivingEntity)(Object) this, attacker);
 			SkillEffectService.applyBurningJusticeFireOnHit((LivingEntity)(Object) this, attacker);
+			boolean applied = original.call(level, source, amount);
+			SkillEffectService.applyReapLifeLifesteal(attacker, amount, applied);
+			return applied;
 		}
 		return original.call(level, source, amount);
 	}

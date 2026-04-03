@@ -1,6 +1,7 @@
 package com.wanderershaven.skill;
 
 import com.wanderershaven.classsystem.ClassSystemBootstrap;
+import com.wanderershaven.compat.WeaponCategoryResolver;
 import com.wanderershaven.network.WanderersHavenNetworking;
 import com.wanderershaven.network.PlaySkillAnimationPayload;
 import java.util.List;
@@ -66,6 +67,10 @@ public final class SkillEffectService {
 	private static final long BLUDGEON_COOLDOWN_TICKS            =   300L;
 	private static final long BLUDGEON_DEBUFF_DURATION_TICKS     =   100L;
 	private static final long PIERCING_CHARGE_COOLDOWN_TICKS     =   400L;
+	private static final long SHADOW_STEP_COOLDOWN_TICKS         = 1_200L;
+	private static final long SHADOW_STEP_DURATION_TICKS         =   100L;
+	private static final long GROUND_SLAM_SLOW_DURATION_TICKS    =   100L;
+	private static final long CRUSHING_LEAP_AIR_WINDOW_TICKS     =    80L;
 	private static final long FIGHTING_SPIRIT_COOLDOWN_TICKS     = 6_000L;
 	private static final long FIGHTING_SPIRIT_DURATION_TICKS     =   600L;
 	private static final long FURY_UNLEASHED_COOLDOWN_TICKS      = 18_000L;
@@ -100,6 +105,7 @@ public final class SkillEffectService {
 	private static final String EFX_FLASH_STEP = "flash_step_speed";
 	private static final String EFX_FALLING_PETALS = "falling_petals";
 	private static final String EFX_BUTTERFLY = "dance_of_butterfly";
+	private static final String EFX_SHADOW_STEP = "shadow_step";
 
 	private static final SkillCooldownService COOLDOWNS = new SkillCooldownService();
 	private static final TimedEffectTracker EFFECTS = new TimedEffectTracker();
@@ -111,6 +117,9 @@ public final class SkillEffectService {
 
 	private static final Map<UUID, Float> furyPoints                  = new ConcurrentHashMap<>();
 	private static final Map<UUID, Set<UUID>> danceOfTheButterflyHitEntities = new ConcurrentHashMap<>();
+	private static final Map<UUID, Long> crushingLeapPendingLanding   = new ConcurrentHashMap<>();
+	private static final Map<UUID, Long> crushingLeapNoFallUntil      = new ConcurrentHashMap<>();
+	private static final Map<UUID, Set<UUID>> shadowStepPassedEntities = new ConcurrentHashMap<>();
 	private static final Map<UUID, Integer> sygStacks                 = new ConcurrentHashMap<>();
 	private static final Map<UUID, Long>    sygLastHitAt              = new ConcurrentHashMap<>();
 
@@ -181,6 +190,31 @@ public final class SkillEffectService {
 
 		// Timed entity-attribute debuffs (armor slow etc.)
 		ServerTickEvents.END_SERVER_TICK.register(ATTRIBUTE_DEBUFFS::tick);
+
+		// Crushing Leap — trigger landing slam and cleanup no-fall windows
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			crushingLeapPendingLanding.entrySet().removeIf(entry -> {
+				ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
+				if (player == null) {
+					crushingLeapNoFallUntil.remove(entry.getKey());
+					return true;
+				}
+				long now = player.level().getGameTime();
+				if (now >= entry.getValue()) {
+					return true;
+				}
+				if (!player.onGround()) {
+					return false;
+				}
+				crushingLeapLand(player);
+				return true;
+			});
+			crushingLeapNoFallUntil.entrySet().removeIf(entry -> {
+				ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
+				if (player == null) return true;
+				return player.level().getGameTime() >= entry.getValue();
+			});
+		});
 
 		// Fighting Spirit — expire 50% DR window after 30 seconds
 		ServerTickEvents.END_SERVER_TICK.register(server -> {
@@ -293,6 +327,33 @@ public final class SkillEffectService {
 			}
 		});
 
+		// Shadow Step — track pass-through targets, then burst at expiry
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			for (Map.Entry<UUID, TimedEffectTracker.Window> entry : EFFECTS.snapshot(EFX_SHADOW_STEP).entrySet()) {
+				ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
+				if (player == null) {
+					ClassSystemBootstrap.statEngine().deactivateSource(entry.getKey(), "shadow_step_buff", null);
+					shadowStepPassedEntities.remove(entry.getKey());
+					EFFECTS.clear(entry.getKey(), EFX_SHADOW_STEP);
+					continue;
+				}
+
+				Set<UUID> passed = shadowStepPassedEntities.computeIfAbsent(player.getUUID(), id -> ConcurrentHashMap.newKeySet());
+				for (LivingEntity touched : nearbyEnemies(player, 0.8)) {
+					passed.add(touched.getUUID());
+				}
+
+				if (player.level().getGameTime() < entry.getValue().expiresAt()) {
+					continue;
+				}
+
+				ClassSystemBootstrap.statEngine().deactivateSource(player.getUUID(), "shadow_step_buff", player);
+				EFFECTS.clear(player.getUUID(), EFX_SHADOW_STEP);
+				shadowStepBurst(player, passed);
+				shadowStepPassedEntities.remove(player.getUUID());
+			}
+		});
+
 		// Stand Your Ground — expire hit stacks after 15 seconds of no damage
 		ServerTickEvents.END_SERVER_TICK.register(server -> {
 			for (ServerPlayer player : server.getPlayerList().getPlayers()) {
@@ -337,7 +398,11 @@ public final class SkillEffectService {
 		registry.register("heavy_strikes", SkillEffectService::executeHeavyStrikes);
 		registry.register("battle_cry_weak", SkillEffectService::executeBattleCryWeak);
 		registry.register("bludgeon", SkillEffectService::executeBludgeon);
+		registry.register("ground_slam", SkillEffectService::executeGroundSlam);
 		registry.register("piercing_charge", SkillEffectService::executePiercingCharge);
+		registry.register("grasscutter", SkillEffectService::executeGrasscutter);
+		registry.register("crushing_leap", SkillEffectService::executeCrushingLeap);
+		registry.register("shadow_step", SkillEffectService::executeShadowStep);
 		registry.register("fury_unleashed", SkillEffectService::executeFuryUnleashed);
 		registry.register("smite", SkillEffectService::executeSmite);
 		registry.register("shield_bash", SkillEffectService::executeShieldBash);
@@ -369,6 +434,13 @@ public final class SkillEffectService {
 		}
 		if      (skills.contains("enhanced_endurance")) mult *= 0.82f;
 		else if (skills.contains("lesser_endurance"))   mult *= 0.90f;
+		if (source != null && source.is(DamageTypes.FALL)) {
+			Long noFallUntil = crushingLeapNoFallUntil.get(player.getUUID());
+			if (noFallUntil != null && player.level().getGameTime() <= noFallUntil) {
+				crushingLeapNoFallUntil.remove(player.getUUID());
+				return 0.0f;
+			}
+		}
 		// Fighting Spirit — 50% DR during active window
 		if (skills.contains("fighting_spirit")
 				&& EFFECTS.isActive(player.getUUID(), EFX_FIGHTING_SPIRIT, player.level().getGameTime())) {
@@ -386,6 +458,22 @@ public final class SkillEffectService {
 			}
 		}
 		return mult;
+	}
+
+	public static boolean isShadowStepActive(ServerPlayer player) {
+		return EFFECTS.isActive(player.getUUID(), EFX_SHADOW_STEP, player.level().getGameTime());
+	}
+
+	public static float getOutgoingDamageMultiplier(ServerPlayer attacker) {
+		return isShadowStepActive(attacker) ? 0.0f : 1.0f;
+	}
+
+	public static void applyReapLifeLifesteal(ServerPlayer attacker, float damageAmount, boolean hitApplied) {
+		if (!hitApplied || damageAmount <= 0.0f) return;
+		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(attacker.getUUID(), "warrior");
+		if (!skills.contains("reap_life")) return;
+		if (!isExecutionerWeapon(attacker)) return;
+		attacker.heal(damageAmount * 0.15f);
 	}
 
 	/** True if the player has Tough Skin or Iron Skin (cactus immunity). */
@@ -625,6 +713,45 @@ public final class SkillEffectService {
 			", armor reduced by 15% for 5 seconds. (15 sec cooldown)"));
 	}
 
+	public static void executeGroundSlam(ServerPlayer player) {
+		long now = player.level().getGameTime();
+		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "ground_slam", now, BLUDGEON_COOLDOWN_TICKS);
+		if (remaining > 0L) {
+			player.sendSystemMessage(Component.literal(
+				"\u00a77[Wanderers Haven]\u00a7r Ground Slam is on cooldown (" + (remaining / 20) + "s remaining)."));
+			return;
+		}
+		COOLDOWNS.start(player.getUUID(), "ground_slam", now);
+		float damage = (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE) * 2.0f;
+		long expiresAt = now + GROUND_SLAM_SLOW_DURATION_TICKS;
+		List<LivingEntity> targets = nearbyEnemies(player, 6.0);
+		if (targets.isEmpty()) {
+			player.sendSystemMessage(Component.literal(
+				"\u00a77[Wanderers Haven]\u00a7r Ground Slam! No enemies in range."));
+			return;
+		}
+		for (LivingEntity target : targets) {
+			target.hurt(player.damageSources().playerAttack(player), damage);
+			ATTRIBUTE_DEBUFFS.apply(
+				target,
+				Attributes.MOVEMENT_SPEED,
+				HARMONY_PAIN_SLOW_MOD,
+				-0.40,
+				AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				expiresAt
+			);
+		}
+		if (player.level() instanceof ServerLevel serverLevel) {
+			serverLevel.sendParticles(ParticleTypes.EXPLOSION,
+				player.getX(), player.getY() + 0.3, player.getZ(),
+				4, 1.0, 0.2, 1.0, 0.0);
+		}
+		int n = targets.size();
+		player.sendSystemMessage(Component.literal(
+			"\u00a7c[Wanderers Haven]\u00a7r Ground Slam! Hit " + n +
+			" enem" + (n == 1 ? "y" : "ies") + " and slowed them. (15 sec cooldown)"));
+	}
+
 	// ── Piercing Charge (active) ──────────────────────────────────────────────
 
 	public static void executePiercingCharge(ServerPlayer player) {
@@ -654,6 +781,123 @@ public final class SkillEffectService {
 			"\u00a7c[Wanderers Haven]\u00a7r Piercing Charge!" +
 			(hit > 0 ? " Hit " + hit + " enem" + (hit == 1 ? "y" : "ies") + "." : "") +
 			" (20 sec cooldown)"));
+	}
+
+	public static void executeGrasscutter(ServerPlayer player) {
+		long now = player.level().getGameTime();
+		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "grasscutter", now, PIERCING_CHARGE_COOLDOWN_TICKS);
+		if (remaining > 0L) {
+			player.sendSystemMessage(Component.literal(
+				"\u00a77[Wanderers Haven]\u00a7r Grasscutter is on cooldown (" + (remaining / 20) + "s remaining)."));
+			return;
+		}
+		COOLDOWNS.start(player.getUUID(), "grasscutter", now);
+
+		float damage = (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE) * 1.5f;
+		int hit = grasscutterSlash(player, damage);
+
+		Vec3 look = player.getLookAngle();
+		Vec3 dashDest = findFlashStepDestination(player, look, 3.0);
+		player.teleportTo(dashDest.x, dashDest.y, dashDest.z);
+		hit += grasscutterSlash(player, damage);
+
+		player.sendSystemMessage(Component.literal(
+			"\u00a7c[Wanderers Haven]\u00a7r Grasscutter! " +
+			(hit > 0 ? "Hit " + hit + " enem" + (hit == 1 ? "y" : "ies") + ". " : "") +
+			"(20 sec cooldown)"));
+	}
+
+	private static int grasscutterSlash(ServerPlayer player, float damage) {
+		List<LivingEntity> targets = nearbyEnemies(player, 3.0);
+		for (LivingEntity target : targets) {
+			target.hurt(player.damageSources().playerAttack(player), damage);
+		}
+		if (player.level() instanceof ServerLevel serverLevel && !targets.isEmpty()) {
+			serverLevel.sendParticles(ParticleTypes.SWEEP_ATTACK,
+				player.getX(), player.getY() + 1.0, player.getZ(),
+				16, 0.9, 0.4, 0.9, 0.02);
+		}
+		return targets.size();
+	}
+
+	public static void executeCrushingLeap(ServerPlayer player) {
+		long now = player.level().getGameTime();
+		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "crushing_leap", now, PIERCING_CHARGE_COOLDOWN_TICKS);
+		if (remaining > 0L) {
+			player.sendSystemMessage(Component.literal(
+				"\u00a77[Wanderers Haven]\u00a7r Crushing Leap is on cooldown (" + (remaining / 20) + "s remaining)."));
+			return;
+		}
+		COOLDOWNS.start(player.getUUID(), "crushing_leap", now);
+		Vec3 look = player.getLookAngle().normalize();
+		player.setDeltaMovement(look.x * 1.35, 1.0, look.z * 1.35);
+		player.hurtMarked = true;
+		crushingLeapPendingLanding.put(player.getUUID(), now + CRUSHING_LEAP_AIR_WINDOW_TICKS);
+		crushingLeapNoFallUntil.put(player.getUUID(), now + CRUSHING_LEAP_AIR_WINDOW_TICKS);
+		player.sendSystemMessage(Component.literal(
+			"\u00a7c[Wanderers Haven]\u00a7r Crushing Leap! Slam down to deal 300% AOE weapon damage. (20 sec cooldown)"));
+	}
+
+	public static void executeShadowStep(ServerPlayer player) {
+		long now = player.level().getGameTime();
+		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "shadow_step", now, SHADOW_STEP_COOLDOWN_TICKS);
+		if (remaining > 0L) {
+			player.sendSystemMessage(Component.literal(
+				"\u00a77[Wanderers Haven]\u00a7r Shadow Step is on cooldown (" + (remaining / 20) + "s remaining)."));
+			return;
+		}
+		if (EFFECTS.isActive(player.getUUID(), EFX_SHADOW_STEP, now)) {
+			player.sendSystemMessage(Component.literal(
+				"\u00a77[Wanderers Haven]\u00a7r Shadow Step is already active."));
+			return;
+		}
+		COOLDOWNS.start(player.getUUID(), "shadow_step", now);
+		EFFECTS.start(player.getUUID(), EFX_SHADOW_STEP, now, SHADOW_STEP_DURATION_TICKS);
+		shadowStepPassedEntities.put(player.getUUID(), ConcurrentHashMap.newKeySet());
+		ClassSystemBootstrap.statEngine().activateSource(player.getUUID(), "shadow_step_buff");
+		player.sendSystemMessage(Component.literal(
+			"\u00a78[Wanderers Haven]\u00a7r Shadow Step! Invulnerable for 5 seconds; damage triggers on expiry. (60 sec cooldown)"));
+	}
+
+	private static void shadowStepBurst(ServerPlayer player, Set<UUID> passedTargets) {
+		float damage = (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE) * 2.0f;
+		int hit = 0;
+		if (player.level().getServer() == null) return;
+		for (ServerLevel level : player.level().getServer().getAllLevels()) {
+			for (UUID id : passedTargets) {
+				net.minecraft.world.entity.Entity entity = level.getEntity(id);
+				if (!(entity instanceof LivingEntity living)) continue;
+				if (living == player) continue;
+				living.hurt(player.damageSources().playerAttack(player), damage);
+				hit++;
+			}
+		}
+		if (player.level() instanceof ServerLevel serverLevel && hit > 0) {
+			serverLevel.sendParticles(ParticleTypes.SMOKE,
+				player.getX(), player.getY() + 1.0, player.getZ(),
+				25, 1.0, 0.6, 1.0, 0.02);
+		}
+		player.sendSystemMessage(Component.literal(
+			"\u00a78[Wanderers Haven]\u00a7r Shadow Step fades." +
+			(hit > 0 ? " Struck " + hit + " enem" + (hit == 1 ? "y" : "ies") + "." : "")
+		));
+	}
+
+	private static void crushingLeapLand(ServerPlayer player) {
+		float damage = (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE) * 3.0f;
+		List<LivingEntity> targets = nearbyEnemies(player, 3.0);
+		for (LivingEntity target : targets) {
+			target.hurt(player.damageSources().playerAttack(player), damage);
+		}
+		if (player.level() instanceof ServerLevel serverLevel) {
+			serverLevel.sendParticles(ParticleTypes.EXPLOSION,
+				player.getX(), player.getY() + 0.2, player.getZ(),
+				8, 0.7, 0.2, 0.7, 0.0);
+		}
+		int n = targets.size();
+		player.sendSystemMessage(Component.literal(
+			"\u00a7c[Wanderers Haven]\u00a7r Crushing Leap impact! " +
+			(n > 0 ? "Hit " + n + " enem" + (n == 1 ? "y" : "ies") + "." : "No enemies in blast radius.")));
 	}
 
 	// -- Dance of Falling Petals (Blade Dancer capstone) -----------------------
@@ -1151,5 +1395,10 @@ public final class SkillEffectService {
 			Math.min(startPos.x, endPos.x) - pad, startPos.y - 0.1, Math.min(startPos.z, endPos.z) - pad,
 			Math.max(startPos.x, endPos.x) + pad, startPos.y + 2.1, Math.max(startPos.z, endPos.z) + pad
 		);
+	}
+
+	private static boolean isExecutionerWeapon(ServerPlayer player) {
+		String category = WeaponCategoryResolver.resolveFromItem(player.getMainHandItem());
+		return "scythe".equals(category) || "executioner".equals(category);
 	}
 }
