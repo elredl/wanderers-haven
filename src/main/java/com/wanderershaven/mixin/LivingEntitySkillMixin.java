@@ -40,6 +40,7 @@ public abstract class LivingEntitySkillMixin {
 		amount *= SkillEffectService.getBattleCryTargetMult(selfId, level.getGameTime());
 
 		if ((Object) this instanceof ServerPlayer player) {
+			SkillEffectService.markInCombat(player);
 			if (SkillEffectService.isShadowStepActive(player)) {
 				return false;
 			}
@@ -71,15 +72,21 @@ public abstract class LivingEntitySkillMixin {
 			ServerPlayer attackingPlayer = attacker instanceof ServerPlayer sp ? sp : null;
 			if (attackingPlayer != null) {
 				amount *= SkillEffectService.getOutgoingDamageMultiplier(attackingPlayer);
+				amount *= SkillEffectService.getAttackerSkillDamageMultiplier(attackingPlayer, player, source, amount);
 			}
 			if (attacker != null) {
 				amount *= SkillEffectService.getBattleCryAttackerMult(attacker.getUUID(), level.getGameTime());
 			}
+			amount *= SkillEffectService.getDamageTypeResistanceMultiplier(player, source);
 			// Pre-application damage reduction (same mechanic as Projectile Protection)
 			float mult = SkillEffectService.getDamageMultiplier(player, source);
 			float finalAmount = amount * mult;
 			boolean applied = original.call(level, source, finalAmount);
 			if (attackingPlayer != null) {
+				SkillEffectService.markInCombat(attackingPlayer);
+				if (applied && finalAmount > 0.0f) {
+					SkillEffectService.recordSuccessfulHit(attackingPlayer);
+				}
 				SkillEffectService.applyReapLifeLifesteal(attackingPlayer, finalAmount, applied);
 			}
 			return applied;
@@ -88,10 +95,15 @@ public abstract class LivingEntitySkillMixin {
 		amount *= SkillEffectService.getPaladinAuraEnemyMult((LivingEntity)(Object) this, level);
 		// Burning Justice — paladin's strikes deal 18% bonus damage (36% for undead) and ignite
 		if (source.getEntity() instanceof ServerPlayer attacker) {
+			SkillEffectService.markInCombat(attacker);
 			amount *= SkillEffectService.getOutgoingDamageMultiplier(attacker);
+			amount *= SkillEffectService.getAttackerSkillDamageMultiplier(attacker, (LivingEntity)(Object) this, source, amount);
 			amount *= SkillEffectService.getBurningJusticeDamageMult((LivingEntity)(Object) this, attacker);
 			SkillEffectService.applyBurningJusticeFireOnHit((LivingEntity)(Object) this, attacker);
 			boolean applied = original.call(level, source, amount);
+			if (applied && amount > 0.0f) {
+				SkillEffectService.recordSuccessfulHit(attacker);
+			}
 			SkillEffectService.applyReapLifeLifesteal(attacker, amount, applied);
 			return applied;
 		}
@@ -108,8 +120,14 @@ public abstract class LivingEntitySkillMixin {
 	)
 	private MobEffectInstance wh_modifyPoisonDuration(MobEffectInstance effect) {
 		if (!((Object) this instanceof ServerPlayer player)) return effect;
-		if (effect.getEffect() != MobEffects.POISON) return effect;
-		float mult = SkillEffectService.getPoisonDurationMultiplier(player);
+		float mult = 1.0f;
+		if (effect.getEffect() == MobEffects.POISON) {
+			mult = SkillEffectService.getPoisonDurationMultiplier(player);
+		} else if (effect.getEffect() == MobEffects.WEAKNESS
+				|| effect.getEffect() == MobEffects.NAUSEA
+				|| effect.getEffect() == MobEffects.SLOWNESS) {
+			mult = SkillEffectService.getMagicDebuffDurationMultiplier(player);
+		}
 		if (mult >= 1.0f) return effect;
 		int shorter = Math.max(1, (int) (effect.getDuration() * mult));
 		return new MobEffectInstance(

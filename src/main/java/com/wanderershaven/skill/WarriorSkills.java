@@ -40,7 +40,7 @@ public final class WarriorSkills {
 
 			skill("dangersense", 1,
 				"Dangersense",
-				"Battle instincts keep you alert. A red warning appears on your screen whenever a hostile mob is within 4 blocks."),
+				"A red warning appears on your screen whenever a hostile mob is within 4 blocks."),
 
 			skill("lesser_endurance", 1,
 				"Lesser Endurance",
@@ -49,14 +49,6 @@ public final class WarriorSkills {
 			skill("lucky_dodge", 1,
 				"Lucky Dodge",
 				"Some warriors are simply lucky. Once every 10 minutes, the first projectile that would have hit you passes harmlessly by."),
-
-			skill("second_wind_minor", 1,
-				"Second Wind (Minor)",
-				"When things look dire, your body finds hidden reserves. Dropping below 40% health instantly recovers 3 hearts. (10 min cooldown)"),
-
-			skill("last_stand_minor", 1,
-				"Last Stand (Minor)",
-				"Cornered and desperate, you fight harder. Dropping below 40% health surges your combat power, granting 8% attack damage and speed for 10 seconds. (10 min cooldown)"),
 
 			skill("minor_poison_resistance", 1,
 				"Minor Poison Resistance",
@@ -105,16 +97,6 @@ public final class WarriorSkills {
 				"Your body has been tempered through relentless punishment. Take 18% less damage from all sources.",
 				"lesser_endurance"),
 
-			upgrade("second_wind_lesser", 2,
-				"Second Wind (Lesser)",
-				"Your reserves run deeper than before. Dropping below 40% health instantly recovers 4.5 hearts. (8 min cooldown)",
-				"second_wind_minor"),
-
-			upgrade("last_stand_lesser", 2,
-				"Last Stand (Lesser)",
-				"When cornered, you become something to be feared. Dropping below 40% health grants 12% attack damage and speed for 10 seconds. (8 min cooldown)",
-				"last_stand_minor"),
-
 			upgrade("lesser_poison_resistance", 2,
 				"Lesser Poison Resistance",
 				"Toxins barely slow you down anymore. Poison effects last 20% shorter on you.",
@@ -125,137 +107,110 @@ public final class WarriorSkills {
 				"Your body has been hardened beyond flesh. Take 12% less damage from all sources, cactus cannot harm you, and arrows deal 10% less damage.",
 				"tough_skin"),
 
-			skill("adrenaline", 2,
-				"Adrenaline",
-				"When blood is drawn and danger is near, your body surges. Move faster when below half health."),
+			// -----------------------------------------------------------------
+			// PW3 -- Meaningful combat improvements.
+			// -----------------------------------------------------------------
+			skill("lightfooted", 3,
+				"Lightfooted",
+				"Gain 15% movement speed and 50% jump boost while in combat."),
 
-			skill("executioners_eye", 2,
-				"Executioner's Eye",
-				"You know exactly where to strike a weakened foe. Attacks against enemies below 30% health deal bonus damage."),
+			skill("wound_closure", 3,
+				"Wound Closure",
+				"Passively regenerate health while in combat."),
 
-			skill("shield_mastery", 2,
-				"Shield Mastery",
-				"You've trained extensively with a shield. Block cooldown is reduced and blocks absorb more damage."),
+			skill("first_strike", 3,
+				"First Strike",
+				"The first attack against an enemy deals 30% more damage."),
+
+			upgrade("greater_dangersense", 3,
+				"Greater Dangersense",
+				"Keeps Dangersense: a red warning appears when a hostile mob is within 4 blocks. Also take 20% less damage from attacks from behind you.",
+				"dangersense"),
+
+			skill("measured_strikes", 3,
+				"Measured Strikes",
+				"Attacks have a 10% chance to ignore 20% enemy armor."),
+
+			skill("critical_hits", 3,
+				"Critical Hits",
+				"Gain 10% chance to critically hit for 150% damage."),
+
+			upgrade("enhanced_poison_resistance", 3,
+				"Enhanced Poison Resistance",
+				"Poison effects last 20% shorter on you.",
+				"lesser_poison_resistance"),
+
+			skill("lesser_resistance_fire", 3,
+				"Lesser Resistance: Fire",
+				"Fire effect lasts 15% less."),
+
+			skill("lesser_resistance_blades", 3,
+				"Lesser Resistance: Blades",
+				"Take 10% less damage from slashing weapons."),
+
+			skill("lesser_resistance_bludgeoning", 3,
+				"Lesser Resistance: Bludgeoning",
+				"Take 10% less damage from bludgeoning weapons and unarmed attacks."),
+
+			skill("lesser_resistance_piercing", 3,
+				"Lesser Resistance: Piercing",
+				"Take 10% less damage from piercing weapons (spears, arrows, and similar attacks)."),
+
+			skill("lesser_resistance_magic", 3,
+				"Lesser Resistance: Magic",
+				"Weakness, Nausea, and Slowness effects last 10% shorter on you."),
 
 			// -----------------------------------------------------------------
-			// PW3 -- Combat starts to flow differently.
+			// PW4 -- Strong upgrades that lock in a build.
 			// -----------------------------------------------------------------
-			skill("battle_cry", 3,
-				"Battle Cry",
-				"The roar of a true warrior. Landing a kill briefly grants you a burst of speed and strength."),
+			upgrade("greater_strength", 4,
+				"Greater Strength",
+				"Builds on Enhanced Strength. Melee attacks deal 35% more damage.",
+				"enhanced_strength"),
 
-			skill("iron_will", 3,
-				"Iron Will",
-				"Your resolve cannot be shaken. You resist knockback significantly -- small hits barely move you."),
+			upgrade("greater_dexterity", 4,
+				"Greater Dexterity",
+				"Builds on Enhanced Dexterity. Gain 28% attack speed.",
+				"enhanced_dexterity"),
 
-			skill("bloodlust", 3,
-				"Bloodlust",
-				"Every kill fuels your body. Restore a small amount of health with each enemy you slay."),
+			upgrade("greater_speed", 4,
+				"Greater Speed",
+				"Builds on Enhanced Speed. Gain 28% movement speed.",
+				"enhanced_speed"),
 
-			// -----------------------------------------------------------------
-			// PW4 -- Defining traits that change how enemies experience you.
-			// -----------------------------------------------------------------
-			skill("berserker", 4,
-				"Berserker",
-				"The closer you are to death, the more dangerous you become. Melee damage scales up as your health drops."),
+			upgrade("greater_endurance", 4,
+				"Greater Endurance",
+				"Builds on Enhanced Endurance. Take 28% less damage from all sources.",
+				"enhanced_endurance"),
 
-			skill("sweeping_edge", 4,
-				"Sweeping Edge",
-				"Your strikes carry through. Each melee hit deals partial damage to all enemies within striking distance."),
+			upgrade("lesser_resistance_elements", 4,
+				"Lesser Resistance: Elements",
+				"Builds on Lesser Resistance: Fire. Take 10% less damage from elemental sources.",
+				"lesser_resistance_fire"),
 
-			skill("fortitude", 4,
-				"Fortitude",
-				"Your body has been forged through punishment. Gain a large increase to your maximum health pool."),
+			upgrade("enhanced_resistance_magic", 4,
+				"Enhanced Resistance: Magic",
+				"Builds on Lesser Resistance: Magic. Weakness, Nausea, and Slowness effects last 18% shorter on you.",
+				"lesser_resistance_magic"),
 
-			// -----------------------------------------------------------------
-			// PW5 -- Powerful. Other players will ask how you did that.
-			// -----------------------------------------------------------------
-			skill("war_god", 5,
-				"War God",
-				"The spirit of war flows through your veins. Receive a significant boost to damage, speed, and armour simultaneously."),
+			skill("lesser_appraisal", 4,
+				"Lesser Appraisal",
+				"You can see the HP, level, and name of mobs/players up to 5 levels above you."),
 
-			skill("death_mark", 5,
-				"Death Mark",
-				"Any enemy you strike is marked for death. Marked enemies take substantially increased damage from all sources."),
+			upgrade("enhanced_resistance_blades", 4,
+				"Enhanced Resistance: Blades",
+				"Builds on Lesser Resistance: Blades. Take 18% less damage from slashing weapons.",
+				"lesser_resistance_blades"),
 
-			skill("tenacity", 5,
-				"Tenacity",
-				"Nothing stops your assault. You are strongly resistant to slowness, weakness, and all debilitating effects."),
+			upgrade("enhanced_resistance_bludgeoning", 4,
+				"Enhanced Resistance: Bludgeoning",
+				"Builds on Lesser Resistance: Bludgeoning. Take 18% less damage from bludgeoning weapons and unarmed attacks.",
+				"lesser_resistance_bludgeoning"),
 
-			// -----------------------------------------------------------------
-			// PW6 -- Strong enough to swing the outcome of any fight.
-			// -----------------------------------------------------------------
-			skill("rampage", 6,
-				"Rampage",
-				"Kill streaks no longer just reward -- they empower. Extended streaks grant escalating boosts to damage and speed."),
-
-			skill("warlord", 6,
-				"Warlord",
-				"Your presence on the battlefield is a force multiplier. Allies within 16 blocks fight noticeably harder in your presence."),
-
-			skill("unstoppable_force", 6,
-				"Unstoppable Force",
-				"You are a siege engine in human form. You break through enemy armour with ease and shrug off resistance effects."),
-
-			// -----------------------------------------------------------------
-			// PW7 -- Near-legendary. Enemies begin to fear your name.
-			// -----------------------------------------------------------------
-			skill("god_of_war", 7,
-				"God of War",
-				"You have surpassed the limits of ordinary warriors. Massive boosts to damage and survivability -- you are the battle."),
-
-			skill("champion", 7,
-				"Champion",
-				"You have proven yourself beyond doubt. Enemies in your vicinity are inflicted with Weakness and Slow as your legend reaches them."),
-
-			skill("titan_strike", 7,
-				"Titan Strike",
-				"Once per engagement, you may channel everything into a single blow that stuns and deals catastrophic damage to any target."),
-
-			// -----------------------------------------------------------------
-			// PW8 -- Legendary. You are a different class of threat.
-			// -----------------------------------------------------------------
-			skill("godslayer", 8,
-				"Godslayer",
-				"You have learned what it takes to kill things that should not die. Deal vastly increased damage to boss-tier enemies."),
-
-			skill("eternal_rage", 8,
-				"Eternal Rage",
-				"Your rage sustains you. While in combat you regenerate health at a rapid rate that shocks those who witness it."),
-
-			skill("avatar_of_war", 8,
-				"Avatar of War",
-				"You are war made flesh. All combat attributes -- damage, speed, armour, health -- are vastly amplified at once."),
-
-			// -----------------------------------------------------------------
-			// PW9 -- World-class power. Your kills ripple outward.
-			// -----------------------------------------------------------------
-			skill("death_incarnate", 9,
-				"Death Incarnate",
-				"Death follows in your wake. Each kill has a chance to animate a shadow effigy of the slain that fights for you briefly."),
-
-			skill("world_breaker", 9,
-				"World Breaker",
-				"Your strikes carry seismic force. Blows send shockwaves that damage and launch all nearby enemies, not just the target."),
-
-			skill("legend", 9,
-				"Legend",
-				"Your name alone is a weapon. Enemies near you are afflicted with dread -- their attack speed and damage are reduced."),
-
-			// -----------------------------------------------------------------
-			// PW10 -- Reality-altering. Reserved for warriors who have reached the summit.
-			// -----------------------------------------------------------------
-			skill("eternal_warrior", 10,
-				"Eternal Warrior",
-				"You have transcended mortality itself. In combat, lethal hits are denied once every 30 seconds -- you simply refuse to die."),
-
-			skill("world_ender", 10,
-				"World Ender",
-				"Reality bends around your strikes. Every blow carries the force of a cataclysm. Nothing stands before you twice."),
-
-			skill("death_god", 10,
-				"Death God",
-				"You have become the master of death. Each strike carries a chance to instantly end any living thing, regardless of its remaining health.")
+			upgrade("critical_rhythm", 4,
+				"Critical Rhythm",
+				"Builds on Critical Hits. Start at 10% crit chance, then gain +2% per successful hit up to 20%. Crits deal 150% damage.",
+				"critical_hits")
 		);
 	}
 

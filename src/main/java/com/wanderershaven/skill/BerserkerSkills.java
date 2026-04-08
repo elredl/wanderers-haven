@@ -10,8 +10,8 @@ import java.util.List;
  * {@link com.wanderershaven.classsystem.ClassSystemBootstrap} and tagged as exclusive
  * to {@code "warrior_berserker"} — they never appear in any other warrior's roll pool.
  *
- * Upgrade chain note:
- *   Second Wind (Minor) [PW1] → Second Wind (Lesser) [PW2] → Fighting Spirit [PW3 exclusive]
+ * Notable interaction:
+ *   Fighting Spirit is a standalone Berserker-exclusive trigger skill.
  */
 public final class BerserkerSkills {
 
@@ -31,16 +31,11 @@ public final class BerserkerSkills {
 	// ── Exclusive roll pool ───────────────────────────────────────────────────
 	// Enter the roll pool only for players who have accepted the Berserker evolution.
 
-	/**
-	 * Supersedes Second Wind (Lesser) [PW2].
-	 * Full chain: Second Wind (Minor) → Second Wind (Lesser) → Fighting Spirit.
-	 */
-	private static final SkillDefinition FIGHTING_SPIRIT = upgrade(
+	private static final SkillDefinition FIGHTING_SPIRIT = skill(
 		"fighting_spirit", 3,
 		"Fighting Spirit",
 		"Adversity only makes you sharper. When you drop to 40% health, gain 50% damage resistance "
-			+ "for 30 seconds. (5 min cooldown)",
-		"second_wind_lesser"
+			+ "for 30 seconds. (5 min cooldown)"
 	);
 
 	/** Dual passive/active: stores incoming damage as Fury, then burns it for size and power. */
@@ -82,7 +77,4 @@ public final class BerserkerSkills {
 		return SkillDefs.active(CLASS, id, powerLevel, displayName, description);
 	}
 
-	private static SkillDefinition upgrade(String id, int powerLevel, String displayName, String description, String supersedesId) {
-		return SkillDefs.upgrade(CLASS, id, powerLevel, displayName, description, supersedesId);
-	}
 }

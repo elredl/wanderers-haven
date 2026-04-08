@@ -2,6 +2,7 @@ package com.wanderershaven.stat;
 
 import com.wanderershaven.classsystem.ClassSystemBootstrap;
 import com.wanderershaven.compat.WeaponCategoryResolver;
+import com.wanderershaven.skill.SkillEffectService;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
@@ -34,7 +35,12 @@ public final class SkillStatTable {
 		engine.register("enhanced_strength",
 			StatContribution.always(Attributes.ATTACK_DAMAGE, id("enhanced_strength"),
 				0.20, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
-				p -> owns(p, "enhanced_strength")));
+				p -> owns(p, "enhanced_strength") && !owns(p, "greater_strength")));
+
+		engine.register("greater_strength",
+			StatContribution.always(Attributes.ATTACK_DAMAGE, id("greater_strength"),
+				0.35, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "greater_strength")));
 
 		// Lesser Dexterity / Enhanced Dexterity
 		engine.register("lesser_dexterity",
@@ -45,7 +51,12 @@ public final class SkillStatTable {
 		engine.register("enhanced_dexterity",
 			StatContribution.always(Attributes.ATTACK_SPEED, id("enhanced_dexterity"),
 				0.18, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
-				p -> owns(p, "enhanced_dexterity")));
+				p -> owns(p, "enhanced_dexterity") && !owns(p, "greater_dexterity")));
+
+		engine.register("greater_dexterity",
+			StatContribution.always(Attributes.ATTACK_SPEED, id("greater_dexterity"),
+				0.28, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "greater_dexterity")));
 
 		// Lesser Speed / Enhanced Speed
 		engine.register("lesser_speed",
@@ -56,7 +67,18 @@ public final class SkillStatTable {
 		engine.register("enhanced_speed",
 			StatContribution.always(Attributes.MOVEMENT_SPEED, id("enhanced_speed"),
 				0.18, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
-				p -> owns(p, "enhanced_speed")));
+				p -> owns(p, "enhanced_speed") && !owns(p, "greater_speed")));
+
+		engine.register("greater_speed",
+			StatContribution.always(Attributes.MOVEMENT_SPEED, id("greater_speed"),
+				0.28, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "greater_speed")));
+
+		// Lightfooted — +15% movement speed while in combat
+		engine.register("lightfooted",
+			StatContribution.always(Attributes.MOVEMENT_SPEED, id("lightfooted"),
+				0.15, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "lightfooted") && SkillEffectService.isInCombat(p)));
 
 		// Stand Your Ground — permanent knockback immunity
 		engine.register("stand_your_ground",

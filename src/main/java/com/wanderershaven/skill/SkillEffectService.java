@@ -14,6 +14,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.network.chat.Component;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -25,6 +26,7 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.core.particles.ParticleTypes;
@@ -33,6 +35,7 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LightningBolt;
+import net.minecraft.world.damagesource.CombatRules;
 
 /**
  * Applies and manages active skill effects for players.
@@ -95,6 +98,10 @@ public final class SkillEffectService {
 	private static final int  SHIELD_BASH_STUN_TICKS             =    20;
 	private static final long STAND_YOUR_GROUND_WINDOW_TICKS     =   300L;
 	private static final int  STAND_YOUR_GROUND_MAX_STACKS       =    12;
+	private static final long COMBAT_WINDOW_TICKS                =   120L;
+	private static final long DANGERSENSE_WARN_INTERVAL_TICKS    =    20L;
+	private static final long WOUND_CLOSURE_HEAL_INTERVAL_TICKS  =    20L;
+	private static final long APPRAISAL_INTERVAL_TICKS            =    20L;
 
 	private static final String EFX_LAST_STAND = "last_stand";
 	private static final String EFX_HEAVY_STRIKES = "heavy_strikes";
@@ -122,6 +129,13 @@ public final class SkillEffectService {
 	private static final Map<UUID, Set<UUID>> shadowStepPassedEntities = new ConcurrentHashMap<>();
 	private static final Map<UUID, Integer> sygStacks                 = new ConcurrentHashMap<>();
 	private static final Map<UUID, Long>    sygLastHitAt              = new ConcurrentHashMap<>();
+	private static final Map<UUID, Long>    inCombatUntil             = new ConcurrentHashMap<>();
+	private static final Map<UUID, Map<UUID, Long>> firstStrikeMarks  = new ConcurrentHashMap<>();
+	private static final Map<UUID, Long> dangersenseLastWarnAt         = new ConcurrentHashMap<>();
+	private static final Map<UUID, Long> woundClosureLastHealAt        = new ConcurrentHashMap<>();
+	private static final Map<UUID, Integer> fireTicksLastSeen          = new ConcurrentHashMap<>();
+	private static final Map<UUID, Integer> criticalRhythmStacks       = new ConcurrentHashMap<>();
+	private static final Map<UUID, Long> appraisalLastShownAt          = new ConcurrentHashMap<>();
 
 	// Stun (Shield Bash)
 	private static final Map<UUID, Long> stunnedEntities = new ConcurrentHashMap<>();
@@ -369,6 +383,18 @@ public final class SkillEffectService {
 			}
 		});
 
+		// Base warrior combat-passive loop
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+				handleDangersense(player);
+				handleLightfootedJump(player);
+				handleWoundClosure(player);
+				handleFireResistance(player);
+				handleLesserAppraisal(player);
+			}
+			pruneCombatState(server);
+		});
+
 		// Entity stun (Shield Bash)
 		registerStunTick();
 	}
@@ -432,7 +458,8 @@ public final class SkillEffectService {
 				&& skills.contains("iron_skin")) {
 			mult *= 0.90f;
 		}
-		if      (skills.contains("enhanced_endurance")) mult *= 0.82f;
+		if      (skills.contains("greater_endurance"))  mult *= 0.72f;
+		else if (skills.contains("enhanced_endurance")) mult *= 0.82f;
 		else if (skills.contains("lesser_endurance"))   mult *= 0.90f;
 		if (source != null && source.is(DamageTypes.FALL)) {
 			Long noFallUntil = crushingLeapNoFallUntil.get(player.getUUID());
@@ -495,9 +522,95 @@ public final class SkillEffectService {
 	/** Duration multiplier for poison effects (0.80 for Lesser, 0.90 for Minor, 1.0 otherwise). */
 	public static float getPoisonDurationMultiplier(ServerPlayer player) {
 		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
+		if (skills.contains("enhanced_poison_resistance")) return 0.80f;
 		if (skills.contains("lesser_poison_resistance")) return 0.80f;
 		if (skills.contains("minor_poison_resistance"))  return 0.90f;
 		return 1.0f;
+	}
+
+	/** Duration multiplier for magic debuffs (Weakness, Nausea, Slowness). */
+	public static float getMagicDebuffDurationMultiplier(ServerPlayer player) {
+		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
+		if (skills.contains("enhanced_resistance_magic")) return 0.82f;
+		if (skills.contains("lesser_resistance_magic")) return 0.90f;
+		return 1.0f;
+	}
+
+	/** Incoming damage multiplier from Greater Dangersense and weapon-type resistances. */
+	public static float getDamageTypeResistanceMultiplier(ServerPlayer player, DamageSource source) {
+		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
+		float mult = 1.0f;
+
+		if (skills.contains("greater_dangersense") && isBehindAttack(player, source)) {
+			mult *= 0.80f;
+		}
+
+		if (skills.contains("lesser_resistance_elements") && isElementalDamage(source)) {
+			mult *= 0.90f;
+		}
+
+		String category = incomingWeaponCategory(source);
+		if (skills.contains("lesser_resistance_piercing") && "piercing".equals(category)) {
+			mult *= 0.90f;
+		}
+		if (skills.contains("enhanced_resistance_bludgeoning") && "bludgeoning".equals(category)) {
+			mult *= 0.82f;
+		} else if (skills.contains("lesser_resistance_bludgeoning") && "bludgeoning".equals(category)) {
+			mult *= 0.90f;
+		}
+		if (skills.contains("enhanced_resistance_blades") && "blades".equals(category)) {
+			mult *= 0.82f;
+		} else if (skills.contains("lesser_resistance_blades") && "blades".equals(category)) {
+			mult *= 0.90f;
+		}
+		return mult;
+	}
+
+	/** Attacker-side multipliers for First Strike, crits, and Measured Strikes. */
+	public static float getAttackerSkillDamageMultiplier(ServerPlayer attacker, LivingEntity target, DamageSource source, float preArmorAmount) {
+		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(attacker.getUUID(), "warrior");
+		float mult = 1.0f;
+		long now = attacker.level().getGameTime();
+
+		if (skills.contains("first_strike") && isFirstStrike(attacker, target, now)) {
+			mult *= 1.30f;
+		}
+
+		if (skills.contains("critical_rhythm")) {
+			int stacks = Math.min(criticalRhythmStacks.getOrDefault(attacker.getUUID(), 0), 5);
+			float chance = 0.10f + (stacks * 0.02f);
+			if (attacker.level().random.nextFloat() < chance) {
+				mult *= 1.50f;
+			}
+		} else if (skills.contains("critical_hits") && attacker.level().random.nextFloat() < 0.10f) {
+			mult *= 1.50f;
+		}
+
+		if (skills.contains("measured_strikes") && attacker.level().random.nextFloat() < 0.10f) {
+			mult *= measuredStrikeMultiplier(target, source, preArmorAmount);
+		}
+
+		return mult;
+	}
+
+	public static void markInCombat(ServerPlayer player) {
+		markInCombat(player.getUUID(), player.level().getGameTime());
+	}
+
+	public static void markInCombat(UUID playerId, long gameTime) {
+		inCombatUntil.put(playerId, gameTime + COMBAT_WINDOW_TICKS);
+	}
+
+	public static void recordSuccessfulHit(ServerPlayer attacker) {
+		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(attacker.getUUID(), "warrior");
+		if (!skills.contains("critical_rhythm")) return;
+		int current = criticalRhythmStacks.getOrDefault(attacker.getUUID(), 0);
+		criticalRhythmStacks.put(attacker.getUUID(), Math.min(5, current + 1));
+	}
+
+	public static boolean isInCombat(ServerPlayer player) {
+		Long until = inCombatUntil.get(player.getUUID());
+		return until != null && player.level().getGameTime() <= until;
 	}
 
 	/** True if the player has Slow Metabolism. */
@@ -1366,6 +1479,179 @@ public final class SkillEffectService {
 	}
 
 	// ── Internal helpers ──────────────────────────────────────────────────────
+
+	private static void pruneCombatState(net.minecraft.server.MinecraftServer server) {
+		long now = server.getTickCount();
+		inCombatUntil.entrySet().removeIf(entry -> now > entry.getValue());
+		firstStrikeMarks.entrySet().removeIf(entry -> {
+			entry.getValue().entrySet().removeIf(mark -> now > mark.getValue());
+			return entry.getValue().isEmpty();
+		});
+		criticalRhythmStacks.entrySet().removeIf(entry -> {
+			Long until = inCombatUntil.get(entry.getKey());
+			return until == null || now > until;
+		});
+	}
+
+	private static void handleDangersense(ServerPlayer player) {
+		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
+		if (!skills.contains("dangersense") && !skills.contains("greater_dangersense")) return;
+		if (nearbyEnemies(player, 4.0).isEmpty()) return;
+		long now = player.level().getGameTime();
+		long last = dangersenseLastWarnAt.getOrDefault(player.getUUID(), Long.MIN_VALUE / 2);
+		if (now - last < DANGERSENSE_WARN_INTERVAL_TICKS) return;
+		dangersenseLastWarnAt.put(player.getUUID(), now);
+		player.displayClientMessage(Component.literal("\u00a7c[Danger]\u00a7r Hostile nearby!"), true);
+	}
+
+	private static void handleLightfootedJump(ServerPlayer player) {
+		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
+		if (!skills.contains("lightfooted") || !isInCombat(player)) return;
+		player.addEffect(new MobEffectInstance(MobEffects.JUMP_BOOST, 40, 0, false, false, true));
+	}
+
+	private static void handleWoundClosure(ServerPlayer player) {
+		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
+		if (!skills.contains("wound_closure") || !isInCombat(player)) return;
+		long now = player.level().getGameTime();
+		long last = woundClosureLastHealAt.getOrDefault(player.getUUID(), Long.MIN_VALUE / 2);
+		if (now - last < WOUND_CLOSURE_HEAL_INTERVAL_TICKS) return;
+		woundClosureLastHealAt.put(player.getUUID(), now);
+		if (player.getHealth() < player.getMaxHealth()) {
+			player.heal(1.0f);
+		}
+	}
+
+	private static void handleFireResistance(ServerPlayer player) {
+		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
+		if (!skills.contains("lesser_resistance_fire")) {
+			fireTicksLastSeen.remove(player.getUUID());
+			return;
+		}
+		int nowTicks = player.getRemainingFireTicks();
+		if (nowTicks <= 0) {
+			fireTicksLastSeen.put(player.getUUID(), 0);
+			return;
+		}
+		int last = fireTicksLastSeen.getOrDefault(player.getUUID(), 0);
+		if (nowTicks > last) {
+			int reduced = Math.max(1, (int) Math.ceil(nowTicks * 0.85));
+			player.setRemainingFireTicks(reduced);
+			fireTicksLastSeen.put(player.getUUID(), reduced);
+			return;
+		}
+		fireTicksLastSeen.put(player.getUUID(), nowTicks);
+	}
+
+	private static void handleLesserAppraisal(ServerPlayer player) {
+		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
+		if (!skills.contains("lesser_appraisal")) return;
+		long now = player.level().getGameTime();
+		long last = appraisalLastShownAt.getOrDefault(player.getUUID(), Long.MIN_VALUE / 2);
+		if (now - last < APPRAISAL_INTERVAL_TICKS) return;
+
+		LivingEntity target = appraisalTarget(player, 16.0);
+		if (target == null) return;
+
+		int playerLevel = ClassSystemBootstrap.levelEngine().classLevel(player.getUUID(), "warrior");
+		int targetLevel = appraisalLevel(target);
+		if (targetLevel > playerLevel + 5) return;
+
+		appraisalLastShownAt.put(player.getUUID(), now);
+		int hp = Math.round(target.getHealth());
+		int maxHp = Math.round(target.getMaxHealth());
+		String name = target.getDisplayName().getString();
+		player.displayClientMessage(Component.literal(
+			"\u00a7e[Appraisal]\u00a7r " + name + "  Lv." + targetLevel + "  HP " + hp + "/" + maxHp
+		), true);
+	}
+
+	private static boolean isBehindAttack(ServerPlayer player, DamageSource source) {
+		net.minecraft.world.entity.Entity attacker = source.getEntity();
+		if (!(attacker instanceof LivingEntity living)) return false;
+		Vec3 forward = player.getLookAngle().normalize();
+		Vec3 toAttacker = living.position().subtract(player.position()).normalize();
+		return forward.dot(toAttacker) < -0.30;
+	}
+
+	private static String incomingWeaponCategory(DamageSource source) {
+		if (source.getDirectEntity() instanceof AbstractArrow) {
+			return "piercing";
+		}
+		net.minecraft.world.entity.Entity attacker = source.getEntity();
+		if (!(attacker instanceof LivingEntity living)) return "bludgeoning";
+		ItemStack held = living.getMainHandItem();
+		String category = WeaponCategoryResolver.resolveFromItem(held);
+		if (category == null) return "bludgeoning";
+		return switch (category) {
+			case "spear", "ranged" -> "piercing";
+			case "mauler" -> "bludgeoning";
+			case "duelist", "bladedancer", "blademaster", "axe", "scythe" -> "blades";
+			default -> "bludgeoning";
+		};
+	}
+
+	private static boolean isElementalDamage(DamageSource source) {
+		if (source == null) return false;
+		return source.is(DamageTypes.IN_FIRE)
+			|| source.is(DamageTypes.ON_FIRE)
+			|| source.is(DamageTypes.LAVA)
+			|| source.is(DamageTypes.HOT_FLOOR)
+			|| source.is(DamageTypes.LIGHTNING_BOLT)
+			|| source.is(DamageTypes.FREEZE);
+	}
+
+	private static LivingEntity appraisalTarget(ServerPlayer player, double range) {
+		Vec3 eye = player.getEyePosition();
+		Vec3 look = player.getLookAngle().normalize();
+		LivingEntity best = null;
+		double bestDist = range + 0.1;
+		List<LivingEntity> candidates = player.level().getEntitiesOfClass(
+			LivingEntity.class,
+			player.getBoundingBox().inflate(range),
+			e -> e != player
+		);
+		for (LivingEntity e : candidates) {
+			if (!player.hasLineOfSight(e)) continue;
+			Vec3 to = e.getEyePosition().subtract(eye);
+			double dist = to.length();
+			if (dist > range || dist < 0.01) continue;
+			double dot = look.dot(to.normalize());
+			if (dot < 0.965) continue;
+			if (dist < bestDist) {
+				bestDist = dist;
+				best = e;
+			}
+		}
+		return best;
+	}
+
+	private static int appraisalLevel(LivingEntity target) {
+		if (target instanceof ServerPlayer sp) {
+			return ClassSystemBootstrap.levelEngine().classLevel(sp.getUUID(), "warrior");
+		}
+		String entityId = BuiltInRegistries.ENTITY_TYPE.getKey(target.getType()).toString();
+		double difficulty = com.wanderershaven.levelup.MobDifficulty.of(entityId);
+		return Math.max(1, (int) Math.ceil(difficulty * 10.0));
+	}
+
+	private static boolean isFirstStrike(ServerPlayer attacker, LivingEntity target, long now) {
+		Map<UUID, Long> marks = firstStrikeMarks.computeIfAbsent(attacker.getUUID(), ignored -> new ConcurrentHashMap<>());
+		Long until = marks.get(target.getUUID());
+		if (until != null && now <= until) return false;
+		marks.put(target.getUUID(), now + COMBAT_WINDOW_TICKS);
+		return true;
+	}
+
+	private static float measuredStrikeMultiplier(LivingEntity target, DamageSource source, float preArmorAmount) {
+		float armor = (float) target.getAttributeValue(Attributes.ARMOR);
+		float toughness = (float) target.getAttributeValue(Attributes.ARMOR_TOUGHNESS);
+		float normal = CombatRules.getDamageAfterAbsorb(target, preArmorAmount, source, armor, toughness);
+		if (normal <= 0.0001f) return 1.0f;
+		float reducedArmor = Math.max(0.0f, armor * 0.8f);
+		float ignored = CombatRules.getDamageAfterAbsorb(target, preArmorAmount, source, reducedArmor, toughness);
+		return Math.max(1.0f, ignored / normal);
+	}
 
 	private static boolean isInFrontCone(ServerPlayer player, LivingEntity entity, double maxDist, double minDot) {
 		Vec3 toEntity = entity.position().subtract(player.position());
