@@ -3,6 +3,7 @@ package com.wanderershaven.levelup;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Difficulty ratings for Minecraft entity types, used to scale XP from mob kills.
@@ -103,14 +104,29 @@ public final class MobDifficulty {
 		DIFFICULTIES = Collections.unmodifiableMap(m);
 	}
 
+	/** Difficulties registered at runtime by companion mods (e.g. wanderers-haven-mobs). */
+	private static final Map<String, Double> CUSTOM = new ConcurrentHashMap<>();
+
 	private MobDifficulty() {}
 
 	/**
+	 * Registers a custom difficulty for an entity type from a companion mod.
+	 * Companion mods call this via reflection so they compile without a hard dep.
+	 * Safe to call from any thread; uses a ConcurrentHashMap.
+	 */
+	public static void register(String entityTypeId, double difficulty) {
+		CUSTOM.put(entityTypeId, difficulty);
+	}
+
+	/**
 	 * Returns the difficulty for the given entity type ID.
+	 * Checks custom registrations first, then the built-in table.
 	 * Unknown entity types default to 1.0 (treated as easy hostiles).
 	 * Returns 0.0 for passive mobs that should not grant combat XP.
 	 */
 	public static double of(String entityTypeId) {
+		Double custom = CUSTOM.get(entityTypeId);
+		if (custom != null) return custom;
 		return DIFFICULTIES.getOrDefault(entityTypeId, 1.0);
 	}
 }

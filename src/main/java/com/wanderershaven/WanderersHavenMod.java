@@ -2,6 +2,7 @@ package com.wanderershaven;
 
 import com.wanderershaven.classsystem.ClassSystemBootstrap;
 import com.wanderershaven.command.WhCommand;
+import com.wanderershaven.item.ModItems;
 import com.wanderershaven.network.WanderersHavenNetworking;
 import com.wanderershaven.skill.SkillEffectService;
 import net.fabricmc.api.ModInitializer;
@@ -17,6 +18,7 @@ public class WanderersHavenMod implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
+		ModItems.register();
 		ClassSystemBootstrap.initialize();
 		WanderersHavenNetworking.registerCommon();
 		WanderersHavenNetworking.registerServerReceiver();

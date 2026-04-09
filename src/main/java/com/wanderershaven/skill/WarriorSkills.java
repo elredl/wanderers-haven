@@ -3,14 +3,7 @@ package com.wanderershaven.skill;
 import java.util.List;
 
 /**
- * All skill definitions for the Warrior class, organised by power level.
- *
- * Power level flavour guide:
- *   PW 1-2  : minor passive buffs -- noticeable but subtle
- *   PW 3-4  : meaningful combat improvements -- changes how fights feel
- *   PW 5-6  : strong, class-defining abilities -- clearly impactful
- *   PW 7-8  : near-legendary power -- other players notice
- *   PW 9-10 : world-class / reality-altering -- the stuff of legends
+ * Warrior base-class skills that currently have concrete gameplay implementations.
  */
 public final class WarriorSkills {
 	private static final String CLASS = "warrior";
@@ -19,9 +12,7 @@ public final class WarriorSkills {
 
 	public static List<SkillDefinition> all() {
 		return List.of(
-			// -----------------------------------------------------------------
-			// PW1 -- Minor passives. A new warrior's first edge.
-			// -----------------------------------------------------------------
+			// PW1 -- Implemented baseline passives + actives.
 			skill("lesser_strength", 1,
 				"Lesser Strength",
 				"Your body grows accustomed to the weight of a weapon. Melee attacks deal 10% more damage."),
@@ -41,6 +32,7 @@ public final class WarriorSkills {
 			skill("dangersense", 1,
 				"Dangersense",
 				"A red warning appears on your screen whenever a hostile mob is within 4 blocks."),
+
 
 			skill("lesser_endurance", 1,
 				"Lesser Endurance",
@@ -74,9 +66,7 @@ public final class WarriorSkills {
 				"Piercing Charge",
 				"You hurl yourself forward like a battering ram. Activate to dash 5 blocks in the direction you are facing, dealing 130% weapon damage to all enemies in your path. (20 sec cooldown)"),
 
-			// -----------------------------------------------------------------
-			// PW2 -- Small improvements that start shaping a playstyle.
-			// -----------------------------------------------------------------
+			// PW2 -- Implemented upgrades.
 			upgrade("enhanced_strength", 2,
 				"Enhanced Strength",
 				"Your muscles have hardened beyond what most warriors achieve. Melee attacks deal 20% more damage.",

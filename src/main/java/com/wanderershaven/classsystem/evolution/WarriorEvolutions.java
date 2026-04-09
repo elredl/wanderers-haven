@@ -7,8 +7,10 @@ import com.wanderershaven.skill.BladeDancerSkills;
 import com.wanderershaven.skill.BlademasterSkills;
 import com.wanderershaven.skill.DuelistSkills;
 import com.wanderershaven.skill.ExecutionerSkills;
+import com.wanderershaven.skill.HeadhunterSkills;
 import com.wanderershaven.skill.MaulerSkills;
 import com.wanderershaven.skill.PaladinSkills;
+import com.wanderershaven.skill.SpearmasterSkills;
 import com.wanderershaven.skill.VanguardSkills;
 import java.util.List;
 
@@ -161,6 +163,7 @@ public final class WarriorEvolutions {
 		)
 			.requires(EvolutionPrerequisite.classLevel(25))
 			.requires(EvolutionPrerequisite.killsWithWeapon("spear", 200))
+			.skillSet(SpearmasterSkills.skillSet())
 			.build();
 	}
 
@@ -178,6 +181,7 @@ public final class WarriorEvolutions {
 		)
 			.requires(EvolutionPrerequisite.classLevel(25))
 			.requires(EvolutionPrerequisite.killsWithWeapon("axe", 200))
+			.skillSet(HeadhunterSkills.skillSet())
 			.build();
 	}
 

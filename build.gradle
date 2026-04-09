@@ -43,11 +43,13 @@ dependencies {
 	// here is for dev convenience only — fabric.mod.json lists it under "suggests".
 	modImplementation "maven.modrinth:better-combat:3.0.1+1.21.11-fabric"
 
-	// Simply Swords — soft dependency (optional at runtime). Enables spear/chakram/scythe
-	// weapon types and their evolution paths. No SS classes are imported directly;
-	// detection is tag-based via SimplySwordsCompat.
-	// Uncomment and add the maven coordinate when developing SS-specific features:
-	// modCompileOnly "maven.modrinth:simply-swords:<version>-fabric"
+	// Simply Swords — disabled until fzzy_config updates for 1.21.11
+	// fzzy_config 0.7.6+1.21 causes ClassNotFoundException: kotlin.jvm.internal.Intrinsics on 1.21.11
+	// modCompileOnly "maven.modrinth:simply-swords:1.63.0-1.21.1"
+	// modRuntimeOnly "maven.modrinth:simply-swords:1.63.0-1.21.1"
+	// modRuntimeOnly "maven.modrinth:fzzy-config:0.7.6+1.21"
+	modRuntimeOnly "maven.modrinth:architectury-api:19.0.1+fabric"
+	modRuntimeOnly "maven.modrinth:fabric-language-kotlin:1.13.10+kotlin.2.3.20"
 
 	// Required by Better Combat
 	modImplementation "me.shedaniel.cloth:cloth-config-fabric:21.11.152"

@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import net.fabricmc.fabric.api.entity.event.v1.ServerEntityCombatEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -54,6 +55,7 @@ public final class SkillEffectService {
 	public static final Identifier BLUDGEON_ARMOR_MOD    = Identifier.fromNamespaceAndPath("wanderers_haven", "bludgeon_armor");
 	public static final Identifier SHIELD_BASH_ARMOR_MOD = Identifier.fromNamespaceAndPath("wanderers_haven", "shield_bash_armor");
 	public static final Identifier HARMONY_PAIN_SLOW_MOD = Identifier.fromNamespaceAndPath("wanderers_haven", "harmony_pain_slow");
+	public static final Identifier MADDENING_ARMOR_MOD   = Identifier.fromNamespaceAndPath("wanderers_haven", "maddening_armor");
 
 	// ── Cooldown / duration constants ─────────────────────────────────────────
 
@@ -65,6 +67,9 @@ public final class SkillEffectService {
 	private static final long LAST_STAND_DURATION_TICKS          =   200L;
 	private static final long HEAVY_STRIKES_COOLDOWN_TICKS       =   600L;
 	private static final long HEAVY_STRIKES_DURATION_TICKS       =   200L;
+	private static final long BLEED_DURATION_TICKS               =    60L;
+	private static final long BLEED_TICK_INTERVAL_TICKS          =    20L;
+	private static final float BLEED_HEALING_MULT                =   0.50f;
 	private static final long BATTLE_CRY_WEAK_COOLDOWN_TICKS     =   900L;
 	private static final long BATTLE_CRY_WEAK_DURATION_TICKS     =   160L;
 	private static final long BLUDGEON_COOLDOWN_TICKS            =   300L;
@@ -92,6 +97,9 @@ public final class SkillEffectService {
 	private static final long HARMONY_OF_PAIN_DURATION_TICKS     =   200L;
 	private static final long DANCE_OF_THE_BUTTERFLY_COOLDOWN_TICKS = 400L;
 	private static final long DANCE_OF_THE_BUTTERFLY_DURATION_TICKS = 100L;
+	private static final long TRIPLE_THRUST_COOLDOWN_TICKS       =   160L;
+	private static final long LENGTHENED_STRIKES_COOLDOWN_TICKS  = 1_200L;
+	private static final long LENGTHENED_STRIKES_DURATION_TICKS  =   400L;
 	private static final long SHIELDS_PROTECTION_COOLDOWN_TICKS  =   140L;
 	private static final long SHIELD_BASH_COOLDOWN_TICKS         =   300L;
 	private static final long SHIELD_BASH_ARMOR_DEBUFF_TICKS     =   100L;
@@ -105,6 +113,7 @@ public final class SkillEffectService {
 
 	private static final String EFX_LAST_STAND = "last_stand";
 	private static final String EFX_HEAVY_STRIKES = "heavy_strikes";
+	private static final String EFX_MADDENING_STRIKES = "maddening_strikes";
 	private static final String EFX_FIGHTING_SPIRIT = "fighting_spirit";
 	private static final String EFX_FURY_UNLEASHED = "fury_unleashed";
 	private static final String EFX_FOCUS = "focus";
@@ -113,6 +122,7 @@ public final class SkillEffectService {
 	private static final String EFX_FALLING_PETALS = "falling_petals";
 	private static final String EFX_BUTTERFLY = "dance_of_butterfly";
 	private static final String EFX_SHADOW_STEP = "shadow_step";
+	private static final String EFX_LENGTHENED_STRIKES = "lengthened_strikes";
 
 	private static final SkillCooldownService COOLDOWNS = new SkillCooldownService();
 	private static final TimedEffectTracker EFFECTS = new TimedEffectTracker();
@@ -136,9 +146,15 @@ public final class SkillEffectService {
 	private static final Map<UUID, Integer> fireTicksLastSeen          = new ConcurrentHashMap<>();
 	private static final Map<UUID, Integer> criticalRhythmStacks       = new ConcurrentHashMap<>();
 	private static final Map<UUID, Long> appraisalLastShownAt          = new ConcurrentHashMap<>();
+	private static final Map<UUID, BleedState> bleedingTargets        = new ConcurrentHashMap<>();
+	private static final Map<UUID, Map<UUID, Integer>> maddeningArmorStacks = new ConcurrentHashMap<>();
+	private static final Map<UUID, GrasscutterFollowup> grasscutterFollowups = new ConcurrentHashMap<>();
 
 	// Stun (Shield Bash)
 	private static final Map<UUID, Long> stunnedEntities = new ConcurrentHashMap<>();
+
+	private record BleedState(long expiresAt, long nextTickAt, float perTickDamage) {}
+	private record GrasscutterFollowup(long executeAt, float damage) {}
 
 	// ── Registration ──────────────────────────────────────────────────────────
 
@@ -165,6 +181,12 @@ public final class SkillEffectService {
 				}
 			}
 		);
+
+		// Reap Life — heal 15% missing health on kill
+		ServerEntityCombatEvents.AFTER_KILLED_OTHER_ENTITY.register((world, attacker, killedEntity, damageSource) -> {
+			if (!(attacker instanceof ServerPlayer player)) return;
+			applyReapLifeOnKill(player);
+		});
 
 		// PlayerStatEngine — single tick that manages all attribute contributions
 		ServerTickEvents.END_SERVER_TICK.register(server ->
@@ -200,6 +222,62 @@ public final class SkillEffectService {
 					EFFECTS.clear(player.getUUID(), EFX_HEAVY_STRIKES);
 				}
 			}
+		});
+
+		// Maddening Strikes — expire buff and clear per-target armor stacks
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			for (Map.Entry<UUID, TimedEffectTracker.Window> entry : EFFECTS.snapshot(EFX_MADDENING_STRIKES).entrySet()) {
+				ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
+				if (player == null) {
+					ClassSystemBootstrap.statEngine().deactivateSource(entry.getKey(), "maddening_strikes_buff", null);
+					maddeningArmorStacks.remove(entry.getKey());
+					EFFECTS.clear(entry.getKey(), EFX_MADDENING_STRIKES);
+					continue;
+				}
+				if (player.level().getGameTime() >= entry.getValue().expiresAt()) {
+					ClassSystemBootstrap.statEngine().deactivateSource(player.getUUID(), "maddening_strikes_buff", player);
+					maddeningArmorStacks.remove(player.getUUID());
+					player.sendSystemMessage(Component.literal(
+						"\u00a77[Wanderers Haven]\u00a7r Maddening Strikes faded."));
+					EFFECTS.clear(player.getUUID(), EFX_MADDENING_STRIKES);
+				}
+			}
+		});
+
+		// Bleed — periodic damage ticks and expiry
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			bleedingTargets.entrySet().removeIf(entry -> {
+				UUID targetId = entry.getKey();
+				BleedState state = entry.getValue();
+				for (ServerLevel level : server.getAllLevels()) {
+					net.minecraft.world.entity.Entity entity = level.getEntity(targetId);
+					if (!(entity instanceof LivingEntity living)) continue;
+					long now = level.getGameTime();
+					if (now >= state.expiresAt()) return true;
+					if (now >= state.nextTickAt()) {
+						living.hurt(level.damageSources().magic(), state.perTickDamage());
+						entry.setValue(new BleedState(state.expiresAt(), now + BLEED_TICK_INTERVAL_TICKS, state.perTickDamage()));
+					}
+					return false;
+				}
+				return true;
+			});
+		});
+
+		// Grasscutter — delayed follow-up slash after short dash travel
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			grasscutterFollowups.entrySet().removeIf(entry -> {
+				ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
+				if (player == null) return true;
+				long now = player.level().getGameTime();
+				GrasscutterFollowup followup = entry.getValue();
+				if (now < followup.executeAt()) return false;
+				int hit = grasscutterSlash(player, followup.damage());
+				player.sendSystemMessage(Component.literal(
+					"\u00a7c[Wanderers Haven]\u00a7r Grasscutter follow-up slash!"
+					+ (hit > 0 ? " Hit " + hit + " enem" + (hit == 1 ? "y" : "ies") + "." : "")));
+				return true;
+			});
 		});
 
 		// Timed entity-attribute debuffs (armor slow etc.)
@@ -292,6 +370,24 @@ public final class SkillEffectService {
 					player.sendSystemMessage(Component.literal(
 						"\u00a77[Wanderers Haven]\u00a7r Focus faded."));
 					EFFECTS.clear(player.getUUID(), EFX_FOCUS);
+				}
+			}
+		});
+
+		// Lengthened Strikes — expire temporary range bonus and distance scaling window
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			for (Map.Entry<UUID, TimedEffectTracker.Window> entry : EFFECTS.snapshot(EFX_LENGTHENED_STRIKES).entrySet()) {
+				ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
+				if (player == null) {
+					ClassSystemBootstrap.statEngine().deactivateSource(entry.getKey(), "lengthened_strikes_buff", null);
+					EFFECTS.clear(entry.getKey(), EFX_LENGTHENED_STRIKES);
+					continue;
+				}
+				if (player.level().getGameTime() >= entry.getValue().expiresAt()) {
+					ClassSystemBootstrap.statEngine().deactivateSource(player.getUUID(), "lengthened_strikes_buff", player);
+					player.sendSystemMessage(Component.literal(
+						"\u00a77[Wanderers Haven]\u00a7r Spear: Lengthened Strikes faded."));
+					EFFECTS.clear(player.getUUID(), EFX_LENGTHENED_STRIKES);
 				}
 			}
 		});
@@ -422,6 +518,7 @@ public final class SkillEffectService {
 	private static ActiveSkillRegistry buildActiveSkillRegistry() {
 		ActiveSkillRegistry registry = new ActiveSkillRegistry();
 		registry.register("heavy_strikes", SkillEffectService::executeHeavyStrikes);
+		registry.register("maddening_strikes", SkillEffectService::executeMaddeningStrikes);
 		registry.register("battle_cry_weak", SkillEffectService::executeBattleCryWeak);
 		registry.register("bludgeon", SkillEffectService::executeBludgeon);
 		registry.register("ground_slam", SkillEffectService::executeGroundSlam);
@@ -439,6 +536,8 @@ public final class SkillEffectService {
 		registry.register("dance_of_the_butterfly", SkillEffectService::executeDanceOfTheButterfly);
 		registry.register("circular_slash", SkillEffectService::executeCircularSlash);
 		registry.register("focus", SkillEffectService::executeFocus);
+		registry.register("triple_thrust", SkillEffectService::executeTripleThrust);
+		registry.register("lengthened_strikes", SkillEffectService::executeLengthenedStrikes);
 		return registry;
 	}
 
@@ -495,12 +594,12 @@ public final class SkillEffectService {
 		return isShadowStepActive(attacker) ? 0.0f : 1.0f;
 	}
 
-	public static void applyReapLifeLifesteal(ServerPlayer attacker, float damageAmount, boolean hitApplied) {
-		if (!hitApplied || damageAmount <= 0.0f) return;
+	public static void applyReapLifeOnKill(ServerPlayer attacker) {
 		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(attacker.getUUID(), "warrior");
 		if (!skills.contains("reap_life")) return;
-		if (!isExecutionerWeapon(attacker)) return;
-		attacker.heal(damageAmount * 0.15f);
+		float missing = attacker.getMaxHealth() - attacker.getHealth();
+		if (missing <= 0.0f) return;
+		attacker.heal(missing * 0.15f);
 	}
 
 	/** True if the player has Tough Skin or Iron Skin (cactus immunity). */
@@ -695,10 +794,68 @@ public final class SkillEffectService {
 			"\u00a7c[Wanderers Haven]\u00a7r Heavy Strikes! +12% damage for 10 seconds. (30 sec cooldown)"));
 	}
 
+	public static void executeMaddeningStrikes(ServerPlayer player) {
+		long now = player.level().getGameTime();
+		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "maddening_strikes", now, HEAVY_STRIKES_COOLDOWN_TICKS);
+		if (remaining > 0L) {
+			player.sendSystemMessage(Component.literal(
+				"\u00a77[Wanderers Haven]\u00a7r Maddening Strikes is on cooldown (" + (remaining / 20) + "s remaining)."));
+			return;
+		}
+		if (EFFECTS.isActive(player.getUUID(), EFX_MADDENING_STRIKES, now)) return;
+		EFFECTS.start(player.getUUID(), EFX_MADDENING_STRIKES, now, HEAVY_STRIKES_DURATION_TICKS);
+		COOLDOWNS.start(player.getUUID(), "maddening_strikes", now);
+		ClassSystemBootstrap.statEngine().activateSource(player.getUUID(), "maddening_strikes_buff");
+		maddeningArmorStacks.put(player.getUUID(), new ConcurrentHashMap<>());
+		player.sendSystemMessage(Component.literal(
+			"\u00a7c[Wanderers Haven]\u00a7r Maddening Strikes! +12% damage, +30% attack speed, and stacking armor shred for 10 seconds. (30 sec cooldown)"));
+	}
+
 	private static void removeHeavyStrikes(ServerPlayer player) {
 		ClassSystemBootstrap.statEngine().deactivateSource(player.getUUID(), "heavy_strikes_buff", player);
 		player.sendSystemMessage(Component.literal(
 			"\u00a77[Wanderers Haven]\u00a7r Heavy Strikes faded."));
+	}
+
+	public static void onSuccessfulPlayerMeleeHit(ServerPlayer attacker, LivingEntity target, float hitDamage) {
+		applyGrievousWounds(attacker, target, hitDamage);
+		applyMaddeningArmorStack(attacker, target);
+	}
+
+	private static void applyGrievousWounds(ServerPlayer attacker, LivingEntity target, float hitDamage) {
+		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(attacker.getUUID(), "warrior");
+		if (!skills.contains("grievous_wounds")) return;
+		float chance = skills.contains("bloodthirst") ? 0.30f : 0.20f;
+		if (attacker.getRandom().nextFloat() >= chance) return;
+		long now = attacker.level().getGameTime();
+		long expiresAt = now + BLEED_DURATION_TICKS;
+		float perTickDamage = Math.max(0.1f, hitDamage * 0.10f);
+		BleedState existing = bleedingTargets.get(target.getUUID());
+		if (existing != null) {
+			perTickDamage = Math.max(perTickDamage, existing.perTickDamage());
+		}
+		bleedingTargets.put(target.getUUID(), new BleedState(expiresAt, now + BLEED_TICK_INTERVAL_TICKS, perTickDamage));
+	}
+
+	private static void applyMaddeningArmorStack(ServerPlayer attacker, LivingEntity target) {
+		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(attacker.getUUID(), "warrior");
+		if (!skills.contains("maddening_strikes")) return;
+		TimedEffectTracker.Window active = EFFECTS.get(attacker.getUUID(), EFX_MADDENING_STRIKES);
+		if (active == null || attacker.level().getGameTime() >= active.expiresAt()) return;
+
+		Map<UUID, Integer> byTarget = maddeningArmorStacks.computeIfAbsent(attacker.getUUID(), id -> new ConcurrentHashMap<>());
+		int stacks = Math.min(byTarget.getOrDefault(target.getUUID(), 0) + 1, 7);
+		byTarget.put(target.getUUID(), stacks);
+
+		double armorReduction = -0.05 * stacks;
+		ATTRIBUTE_DEBUFFS.apply(
+			target,
+			Attributes.ARMOR,
+			MADDENING_ARMOR_MOD,
+			armorReduction,
+			AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+			active.expiresAt()
+		);
 	}
 
 	// ── Battle Cry (Weak) (active) ────────────────────────────────────────────
@@ -714,10 +871,7 @@ public final class SkillEffectService {
 		COOLDOWNS.start(player.getUUID(), "battle_cry_weak", now);
 		long expiresAt = now + BATTLE_CRY_WEAK_DURATION_TICKS;
 
-		ServerLevel serverLevel = (ServerLevel) player.level();
-		double px = player.getX(), py = player.getY() + 1.0, pz = player.getZ();
-		serverLevel.sendParticles(ParticleTypes.ANGRY_VILLAGER, px, py, pz, 40, 1.5, 0.8, 1.5, 0.4);
-		serverLevel.sendParticles(ParticleTypes.CRIT,           px, py, pz, 25, 1.5, 0.8, 1.5, 0.6);
+		SkillParticleService.battleCryWeakCast(player);
 
 		List<LivingEntity> nearby = nearbyEnemies(player, 3.5);
 		if (nearby.isEmpty()) {
@@ -747,10 +901,7 @@ public final class SkillEffectService {
 		COOLDOWNS.start(player.getUUID(), "harmony_of_pain", now);
 		long expiresAt = now + HARMONY_OF_PAIN_DURATION_TICKS;
 
-		ServerLevel serverLevel = (ServerLevel) player.level();
-		double px = player.getX(), py = player.getY() + 1.0, pz = player.getZ();
-		serverLevel.sendParticles(ParticleTypes.SWEEP_ATTACK, px, py, pz, 35, 1.4, 0.7, 1.4, 0.2);
-		serverLevel.sendParticles(ParticleTypes.CRIT,         px, py, pz, 25, 1.4, 0.7, 1.4, 0.5);
+		SkillParticleService.harmonyOfPainCast(player);
 
 		List<LivingEntity> nearby = nearbyEnemies(player, 5.0);
 		if (nearby.isEmpty()) {
@@ -907,16 +1058,17 @@ public final class SkillEffectService {
 		COOLDOWNS.start(player.getUUID(), "grasscutter", now);
 
 		float damage = (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE) * 1.5f;
-		int hit = grasscutterSlash(player, damage);
+		int firstHit = grasscutterSlash(player, damage);
 
-		Vec3 look = player.getLookAngle();
-		Vec3 dashDest = findFlashStepDestination(player, look, 3.0);
-		player.teleportTo(dashDest.x, dashDest.y, dashDest.z);
-		hit += grasscutterSlash(player, damage);
+		Vec3 look = player.getLookAngle().normalize();
+		player.setDeltaMovement(look.x * 1.9, Math.max(player.getDeltaMovement().y, 0.1), look.z * 1.9);
+		player.hurtMarked = true;
+		grasscutterFollowups.put(player.getUUID(), new GrasscutterFollowup(now + 5L, damage));
 
 		player.sendSystemMessage(Component.literal(
 			"\u00a7c[Wanderers Haven]\u00a7r Grasscutter! " +
-			(hit > 0 ? "Hit " + hit + " enem" + (hit == 1 ? "y" : "ies") + ". " : "") +
+			(firstHit > 0 ? "First slash hit " + firstHit + " enem" + (firstHit == 1 ? "y" : "ies") + ". " : "") +
+			"Dashed forward into a second slash. " +
 			"(20 sec cooldown)"));
 	}
 
@@ -925,11 +1077,7 @@ public final class SkillEffectService {
 		for (LivingEntity target : targets) {
 			target.hurt(player.damageSources().playerAttack(player), damage);
 		}
-		if (player.level() instanceof ServerLevel serverLevel && !targets.isEmpty()) {
-			serverLevel.sendParticles(ParticleTypes.SWEEP_ATTACK,
-				player.getX(), player.getY() + 1.0, player.getZ(),
-				16, 0.9, 0.4, 0.9, 0.02);
-		}
+		SkillParticleService.grasscutterSlashBurst(player);
 		return targets.size();
 	}
 
@@ -1040,11 +1188,7 @@ public final class SkillEffectService {
 		for (LivingEntity target : targets) {
 			target.hurt(player.damageSources().playerAttack(player), pulseDamage);
 		}
-		if (!targets.isEmpty() && player.level() instanceof ServerLevel serverLevel) {
-			serverLevel.sendParticles(ParticleTypes.SWEEP_ATTACK,
-				player.getX(), player.getY() + 1.0, player.getZ(),
-				10, 0.8, 0.4, 0.8, 0.02);
-		}
+		if (!targets.isEmpty()) SkillParticleService.fallingPetalsPulse(player, targets);
 	}
 
 	// -- Dance of the Butterfly (Blade Dancer upgrade) -------------------------
@@ -1204,6 +1348,91 @@ public final class SkillEffectService {
 		player.sendSystemMessage(Component.literal(
 			"\u00a7e[Wanderers Haven]\u00a7r Focus dodged an attack!"));
 		return true;
+	}
+
+	// ── Spearmaster upgrades (active) ──────────────────────────────────────────
+
+	public static void executeTripleThrust(ServerPlayer player) {
+		if (!isSpearmasterWeapon(player)) {
+			player.sendSystemMessage(Component.literal(
+				"\u00a77[Wanderers Haven]\u00a7r Triple Thrust requires a spearmaster weapon."));
+			return;
+		}
+		long now = player.level().getGameTime();
+		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "triple_thrust", now, TRIPLE_THRUST_COOLDOWN_TICKS);
+		if (remaining > 0L) {
+			player.sendSystemMessage(Component.literal(
+				"\u00a77[Wanderers Haven]\u00a7r Triple Thrust is on cooldown (" + (remaining / 20) + "s remaining)."));
+			return;
+		}
+		double thrustRange = currentSpearmasterRange(player) * 1.3;
+		float thrustDamage = (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE) * 1.5f;
+		int hit = 0;
+		for (int i = 0; i < 3; i++) {
+			List<LivingEntity> targets = coneEnemies(player, thrustRange, 0.45);
+			for (LivingEntity target : targets) {
+				target.hurt(player.damageSources().playerAttack(player), thrustDamage);
+				hit++;
+			}
+		}
+		COOLDOWNS.start(player.getUUID(), "triple_thrust", now);
+		player.sendSystemMessage(Component.literal(
+			"\u00a7c[Wanderers Haven]\u00a7r Triple Thrust!"
+			+ (hit > 0 ? " Landed " + hit + " thrust hit" + (hit == 1 ? "" : "s") + "." : " No targets in range.")
+			+ " (8 sec cooldown)"));
+	}
+
+	public static void executeLengthenedStrikes(ServerPlayer player) {
+		if (!isSpearmasterWeapon(player)) {
+			player.sendSystemMessage(Component.literal(
+				"\u00a77[Wanderers Haven]\u00a7r Spear: Lengthened Strikes requires a spearmaster weapon."));
+			return;
+		}
+		long now = player.level().getGameTime();
+		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "lengthened_strikes", now, LENGTHENED_STRIKES_COOLDOWN_TICKS);
+		if (remaining > 0L) {
+			player.sendSystemMessage(Component.literal(
+				"\u00a77[Wanderers Haven]\u00a7r Spear: Lengthened Strikes is on cooldown (" + (remaining / 20) + "s remaining)."));
+			return;
+		}
+		if (EFFECTS.isActive(player.getUUID(), EFX_LENGTHENED_STRIKES, now)) {
+			player.sendSystemMessage(Component.literal(
+				"\u00a77[Wanderers Haven]\u00a7r Spear: Lengthened Strikes is already active."));
+			return;
+		}
+		COOLDOWNS.start(player.getUUID(), "lengthened_strikes", now);
+		EFFECTS.start(player.getUUID(), EFX_LENGTHENED_STRIKES, now, LENGTHENED_STRIKES_DURATION_TICKS);
+		ClassSystemBootstrap.statEngine().activateSource(player.getUUID(), "lengthened_strikes_buff");
+		player.sendSystemMessage(Component.literal(
+			"\u00a7c[Wanderers Haven]\u00a7r Spear: Lengthened Strikes! +20% range and up to +25% distance-scaled damage for 20 seconds. (1 min cooldown)"));
+	}
+
+	public static float getSpearmasterDamageMultiplier(ServerPlayer attacker, LivingEntity target) {
+		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(attacker.getUUID(), "warrior");
+		if (!isSpearmasterWeapon(attacker)) return 1.0f;
+
+		float mult = 1.0f;
+
+		if (skills.contains("lengthened_strikes")
+				&& EFFECTS.isActive(attacker.getUUID(), EFX_LENGTHENED_STRIKES, attacker.level().getGameTime())) {
+			double maxRange = Math.max(0.01, currentSpearmasterRange(attacker));
+			double distance = attacker.distanceTo(target);
+			double t = Math.max(0.0, Math.min(1.0, distance / maxRange));
+			mult *= (float) (1.0 + 0.25 * t);
+		}
+		return mult;
+	}
+
+	public static float getHeadhunterDamageMultiplier(ServerPlayer attacker) {
+		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(attacker.getUUID(), "warrior");
+		if (!skills.contains("bloodthirst")) return 1.0f;
+		int bleedingNearby = countBleedingUnitsNearby(attacker, 8.0);
+		return 1.0f + (0.08f * bleedingNearby);
+	}
+
+	public static float modifyIncomingHealing(LivingEntity entity, float baseAmount) {
+		if (!isBleeding(entity.getUUID(), entity.level().getGameTime())) return baseAmount;
+		return baseAmount * BLEED_HEALING_MULT;
 	}
 
 	// ── Parry (Duelist capstone — active counter-attack) ─────────────────────
@@ -1653,6 +1882,44 @@ public final class SkillEffectService {
 		return Math.max(1.0f, ignored / normal);
 	}
 
+	private static boolean isSpearmasterWeapon(ServerPlayer player) {
+		return "spear".equals(WeaponCategoryResolver.resolveFromItem(player.getMainHandItem()));
+	}
+
+	private static double currentSpearmasterRange(ServerPlayer player) {
+		double range = 3.5;
+		if (!isSpearmasterWeapon(player)) return range;
+		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
+		if (skills.contains("spear_mastery")) range *= 1.2;
+		if (skills.contains("lengthened_strikes")
+				&& EFFECTS.isActive(player.getUUID(), EFX_LENGTHENED_STRIKES, player.level().getGameTime())) {
+			range *= 1.2;
+		}
+		return range;
+	}
+
+	private static boolean isBleeding(UUID entityId, long now) {
+		BleedState bleed = bleedingTargets.get(entityId);
+		if (bleed == null) return false;
+		if (now >= bleed.expiresAt()) {
+			bleedingTargets.remove(entityId);
+			return false;
+		}
+		return true;
+	}
+
+	private static int countBleedingUnitsNearby(ServerPlayer attacker, double radius) {
+		double r2 = radius * radius;
+		long now = attacker.level().getGameTime();
+		int count = 0;
+		for (LivingEntity entity : attacker.level().getEntitiesOfClass(LivingEntity.class, attacker.getBoundingBox().inflate(radius))) {
+			if (entity == attacker) continue;
+			if (entity.distanceToSqr(attacker) > r2) continue;
+			if (isBleeding(entity.getUUID(), now)) count++;
+		}
+		return count;
+	}
+
 	private static boolean isInFrontCone(ServerPlayer player, LivingEntity entity, double maxDist, double minDot) {
 		Vec3 toEntity = entity.position().subtract(player.position());
 		double dist = toEntity.length();
@@ -1683,8 +1950,4 @@ public final class SkillEffectService {
 		);
 	}
 
-	private static boolean isExecutionerWeapon(ServerPlayer player) {
-		String category = WeaponCategoryResolver.resolveFromItem(player.getMainHandItem());
-		return "scythe".equals(category) || "executioner".equals(category);
-	}
 }

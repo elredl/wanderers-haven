@@ -15,7 +15,7 @@ public final class ExecutionerSkills {
 		CLASS,
 		"reap_life", 3,
 		"Reap Life",
-		"While wielding executioner weapons, heal for 15% of damage dealt, including active skill damage."
+		"Gain back 15% of your missing health whenever you kill an enemy."
 	);
 
 	private static final SkillDefinition GRASSCUTTER = activeUpgrade(

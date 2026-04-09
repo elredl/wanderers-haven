@@ -76,6 +76,13 @@ public abstract class LivingEntitySkillMixin {
 			}
 			if (attacker != null) {
 				amount *= SkillEffectService.getBattleCryAttackerMult(attacker.getUUID(), level.getGameTime());
+				if (attacker instanceof ServerPlayer serverAttacker) {
+					amount *= SkillEffectService.getSpearmasterDamageMultiplier(serverAttacker, player);
+					amount *= SkillEffectService.getHeadhunterDamageMultiplier(serverAttacker);
+					if (source.is(DamageTypes.PLAYER_ATTACK)) {
+						SkillEffectService.onSuccessfulPlayerMeleeHit(serverAttacker, player, amount);
+					}
+				}
 			}
 			amount *= SkillEffectService.getDamageTypeResistanceMultiplier(player, source);
 			// Pre-application damage reduction (same mechanic as Projectile Protection)
@@ -98,8 +105,13 @@ public abstract class LivingEntitySkillMixin {
 			SkillEffectService.markInCombat(attacker);
 			amount *= SkillEffectService.getOutgoingDamageMultiplier(attacker);
 			amount *= SkillEffectService.getAttackerSkillDamageMultiplier(attacker, (LivingEntity)(Object) this, source, amount);
+			amount *= SkillEffectService.getSpearmasterDamageMultiplier(attacker, (LivingEntity)(Object) this);
+			amount *= SkillEffectService.getHeadhunterDamageMultiplier(attacker);
 			amount *= SkillEffectService.getBurningJusticeDamageMult((LivingEntity)(Object) this, attacker);
 			SkillEffectService.applyBurningJusticeFireOnHit((LivingEntity)(Object) this, attacker);
+			if (source.is(DamageTypes.PLAYER_ATTACK)) {
+				SkillEffectService.onSuccessfulPlayerMeleeHit(attacker, (LivingEntity)(Object) this, amount);
+			}
 			boolean applied = original.call(level, source, amount);
 			if (applied && amount > 0.0f) {
 				SkillEffectService.recordSuccessfulHit(attacker);
@@ -108,6 +120,11 @@ public abstract class LivingEntitySkillMixin {
 			return applied;
 		}
 		return original.call(level, source, amount);
+	}
+
+	@ModifyVariable(method = "heal", at = @At("HEAD"), argsOnly = true, ordinal = 0)
+	private float wh_reduceHealingWhileBleeding(float amount) {
+		return SkillEffectService.modifyIncomingHealing((LivingEntity)(Object) this, amount);
 	}
 
 	// ── Poison Resistance: reduce poison effect duration ─────────────────────

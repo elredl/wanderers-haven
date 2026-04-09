@@ -5,7 +5,11 @@
       "WebFetch(domain:dl.cloudsmith.io)",
       "Bash(./gradlew dependencies:*)",
       "Bash(curl -sI \"https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/software/bernie/geckolib/geckolib-fabric-1.21.1/4.8.4/geckolib-fabric-1.21.1-4.8.4.jar\")",
-      "Bash(./gradlew runClient)"
+      "Bash(./gradlew runClient)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(jar tf:*)",
+      "WebFetch(domain:api.modrinth.com)"
     ]
   }
 }

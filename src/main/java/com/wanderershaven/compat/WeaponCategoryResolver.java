@@ -1,5 +1,6 @@
 package com.wanderershaven.compat;
 
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.item.AxeItem;
@@ -49,38 +50,20 @@ public final class WeaponCategoryResolver {
 	/**
 	 * Resolves weapon category from the item stack alone, without Better Combat.
 	 * Used as a fallback and for non-BC contexts.
-	 *
-	 * Simply Swords checks come first so their weapons map to the correct
-	 * fine-grained category rather than falling through to the vanilla buckets.
 	 */
 	public static String resolveFromItem(ItemStack stack) {
+		String path = BuiltInRegistries.ITEM.getKey(stack.getItem()).getPath();
+
+		// ── Wanderers Haven custom weapons ────────────────────────────────────
+		if (path.endsWith("_twinblades")) return "bladedancer";
+		if (path.endsWith("_greatsword")) return "blademaster";
+		if (path.endsWith("_rapier")) return "duelist";
+		if (path.endsWith("_greathammer")) return "mauler";
+		if (path.endsWith("_scythe")) return "scythe";
+		if (path.endsWith("_mace")) return "mauler";
+
 		// ── Bladedancer ──────────────────────────────────────────────────────
-		if (SimplySwordsCompat.isChakram(stack)
-			|| SimplySwordsCompat.isTwinblade(stack))    return "bladedancer";
-
-		// ── Blademaster (heavy blades) ────────────────────────────────────────
-		if (SimplySwordsCompat.isLongsword(stack)
-			|| SimplySwordsCompat.isClaymore(stack)
-			|| SimplySwordsCompat.isGreatsword(stack))   return "blademaster";
-
-		// ── Spear-class ───────────────────────────────────────────────────────
-		if (SimplySwordsCompat.isSpear(stack)
-			|| SimplySwordsCompat.isGlaive(stack)
-			|| SimplySwordsCompat.isWarglaive(stack)
-			|| SimplySwordsCompat.isHalberd(stack))      return "spear";
-
-		// ── Mauler (heavy blunt / great axes) ────────────────────────────────
-		if (SimplySwordsCompat.isGreathammer(stack)
-			|| SimplySwordsCompat.isGreataxe(stack))     return "mauler";
-
-		// ── Scythe ────────────────────────────────────────────────────────────
-		if (SimplySwordsCompat.isScythe(stack))          return "scythe";
-
-		// ── Duelist (light SS blades + vanilla swords) ────────────────────────
-		if (SimplySwordsCompat.isRapier(stack)
-			|| SimplySwordsCompat.isKatana(stack)
-			|| SimplySwordsCompat.isCutlass(stack)
-			|| SimplySwordsCompat.isSai(stack))          return "duelist";
+		// ── Duelist (vanilla swords) ──────────────────────────────────────────
 		if (stack.is(ItemTags.SWORDS))                   return "duelist";
 
 		// ── Axe (regular only — greataxe is mauler above) ────────────────────
@@ -96,8 +79,7 @@ public final class WeaponCategoryResolver {
 	/**
 	 * Maps Better Combat weapon category strings to our internal vocabulary.
 	 *
-	 * BC categories are defined in weapon config files per mod. This covers the
-	 * expected Simply Swords + vanilla BC set. Unknown categories pass through
+	 * BC categories are defined in weapon config files per mod. Unknown categories pass through
 	 * as-is so they still get stored in signals even if not yet mapped.
 	 */
 	static String normalizeBcCategory(String bcCategory) {
@@ -122,7 +104,7 @@ public final class WeaponCategoryResolver {
 			// Mauler — heavy blunt / great axes
 			case "greataxe", "great_axe",
 				"greathammer", "great_hammer",
-				"warhammer", "war_hammer"                -> "mauler";
+				"warhammer", "war_hammer", "mace"       -> "mauler";
 
 			// Scythe
 			case "scythe"                                -> "scythe";

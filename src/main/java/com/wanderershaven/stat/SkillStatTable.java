@@ -112,6 +112,15 @@ public final class SkillStatTable {
 				0.18, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
 				p -> owns(p, "blade_mastery") && isBlademasterWeapon(p)));
 
+		// Spear Mastery (Spearmaster) — +20% damage and +20% range while holding a spear-class weapon
+		engine.register("spear_mastery",
+			StatContribution.always(Attributes.ATTACK_DAMAGE, id("spear_mastery_damage"),
+				0.20, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "spear_mastery") && isSpearmasterWeapon(p)),
+			StatContribution.always(Attributes.ENTITY_INTERACTION_RANGE, id("spear_mastery_range"),
+				0.20, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "spear_mastery") && isSpearmasterWeapon(p)));
+
 		// Crushing Blows (Mauler) — +40% damage while holding mauler weapons
 		engine.register("crushing_blows",
 			StatContribution.always(Attributes.ATTACK_DAMAGE, id("crushing_blows_damage"),
@@ -125,6 +134,15 @@ public final class SkillStatTable {
 			StatContribution.always(Attributes.ATTACK_DAMAGE, id("heavy_strikes"),
 				0.12, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
 				p -> engine.isSourceActive(p.getUUID(), "heavy_strikes_buff")));
+
+		// Maddening Strikes — +12% damage and +30% attack speed for 10 seconds
+		engine.register("maddening_strikes_buff",
+			StatContribution.always(Attributes.ATTACK_DAMAGE, id("maddening_strikes_damage"),
+				0.12, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> engine.isSourceActive(p.getUUID(), "maddening_strikes_buff")),
+			StatContribution.always(Attributes.ATTACK_SPEED, id("maddening_strikes_speed"),
+				0.30, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> engine.isSourceActive(p.getUUID(), "maddening_strikes_buff")));
 
 		// Last Stand — +8% or +12% damage+speed for 10 seconds (amount set at activation)
 		engine.register("last_stand_buff",
@@ -159,6 +177,12 @@ public final class SkillStatTable {
 			StatContribution.always(Attributes.ATTACK_DAMAGE, id("focus_damage"),
 				0.20, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
 				p -> engine.isSourceActive(p.getUUID(), "focus_buff")));
+
+		// Lengthened Strikes — +20% attack range for 20 seconds
+		engine.register("lengthened_strikes_buff",
+			StatContribution.always(Attributes.ENTITY_INTERACTION_RANGE, id("lengthened_strikes_range"),
+				0.20, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> engine.isSourceActive(p.getUUID(), "lengthened_strikes_buff")));
 
 		// Dance of the Butterfly — +50% movement speed for 5 seconds
 		engine.register("dance_of_butterfly_buff",
@@ -199,6 +223,10 @@ public final class SkillStatTable {
 
 	private static boolean isBlademasterWeapon(ServerPlayer player) {
 		return "blademaster".equals(WeaponCategoryResolver.resolveFromItem(player.getMainHandItem()));
+	}
+
+	private static boolean isSpearmasterWeapon(ServerPlayer player) {
+		return "spear".equals(WeaponCategoryResolver.resolveFromItem(player.getMainHandItem()));
 	}
 
 	private static boolean isMaulerWeapon(ServerPlayer player) {

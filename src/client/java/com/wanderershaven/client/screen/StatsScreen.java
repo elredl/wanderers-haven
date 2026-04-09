@@ -44,19 +44,17 @@ public class StatsScreen extends Screen {
 
 	@Override
 	public void render(GuiGraphics g, int mouseX, int mouseY, float delta) {
-		renderBackground(g, mouseX, mouseY, delta);
-
 		int panelX = (width  - PANEL_WIDTH)  / 2;
 		int panelY = (height - PANEL_HEIGHT) / 2;
 
 		// Background panel
-		g.fill(panelX,     panelY,     panelX + PANEL_WIDTH,     panelY + PANEL_HEIGHT,     0xC0101010);
+		g.fill(panelX,     panelY,     panelX + PANEL_WIDTH,     panelY + PANEL_HEIGHT,     0xFF101010);
 		g.fill(panelX,     panelY,     panelX + PANEL_WIDTH,     panelY + 1,                0xFF555555);
 		g.fill(panelX,     panelY + PANEL_HEIGHT - 1, panelX + PANEL_WIDTH, panelY + PANEL_HEIGHT, 0xFF555555);
 		g.fill(panelX,     panelY,     panelX + 1,               panelY + PANEL_HEIGHT,     0xFF555555);
 		g.fill(panelX + PANEL_WIDTH - 1, panelY, panelX + PANEL_WIDTH, panelY + PANEL_HEIGHT, 0xFF555555);
 
-		g.drawCenteredString(font, title, panelX + PANEL_WIDTH / 2, panelY + 8, 0xFFFFAA);
+		g.drawCenteredString(font, title, panelX + PANEL_WIDTH / 2, panelY + 8, 0xFFFFFFAA);
 		g.fill(panelX + 8, panelY + 19, panelX + PANEL_WIDTH - 8, panelY + 20, 0xFF444444);
 
 		Player player = Minecraft.getInstance().player;
@@ -70,7 +68,7 @@ public class StatsScreen extends Screen {
 		int y      = panelY + 26;
 
 		// ── Offensive ────────────────────────────────────────────────────────
-		g.drawString(font, "\u00a7eOffensive", labelX, y, 0xFFFFFF, false);
+		g.drawString(font, "\u00a7eOffensive", labelX, y, 0xFFFFFFFF, false);
 		y += ROW_HEIGHT;
 
 		double atk = player.getAttributeValue(Attributes.ATTACK_DAMAGE);
@@ -82,7 +80,7 @@ public class StatsScreen extends Screen {
 		y += ROW_HEIGHT + 4;
 
 		// ── Defensive ────────────────────────────────────────────────────────
-		g.drawString(font, "\u00a7eDefensive", labelX, y, 0xFFFFFF, false);
+		g.drawString(font, "\u00a7eDefensive", labelX, y, 0xFFFFFFFF, false);
 		y += ROW_HEIGHT;
 
 		double hp = player.getAttributeValue(Attributes.MAX_HEALTH);
@@ -103,7 +101,7 @@ public class StatsScreen extends Screen {
 		y += ROW_HEIGHT + 4;
 
 		// ── Mobility ─────────────────────────────────────────────────────────
-		g.drawString(font, "\u00a7eMobility", labelX, y, 0xFFFFFF, false);
+		g.drawString(font, "\u00a7eMobility", labelX, y, 0xFFFFFFFF, false);
 		y += ROW_HEIGHT;
 
 		double move = player.getAttributeValue(Attributes.MOVEMENT_SPEED);
@@ -115,7 +113,7 @@ public class StatsScreen extends Screen {
 	}
 
 	private void drawStat(GuiGraphics g, int labelX, int valueX, int y, String label, String value) {
-		g.drawString(font, label, labelX + 4, y, 0xAAAAAA, false);
-		g.drawString(font, value, valueX - font.width(value), y, 0xFFFFFF, false);
+		g.drawString(font, label, labelX + 4, y, 0xFFAAAAAA, false);
+		g.drawString(font, value, valueX - font.width(value), y, 0xFFFFFFFF, false);
 	}
 }
