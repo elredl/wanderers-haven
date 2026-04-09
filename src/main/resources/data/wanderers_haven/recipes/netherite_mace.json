@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " M ",
+    " M ",
+    " S "
+  ],
+  "key": {
+    "M": { "item": "minecraft:netherite_ingot" },
+    "S": { "item": "minecraft:stick" }
+  },
+  "result": { "id": "wanderers_haven:netherite_mace", "count": 1 }
+}

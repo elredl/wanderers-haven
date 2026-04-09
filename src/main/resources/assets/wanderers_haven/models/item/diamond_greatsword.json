@@ -1,0 +1,28 @@
+{
+  "parent": "minecraft:item/handheld",
+  "display": {
+    "thirdperson_righthand": {
+      "rotation": [0, -135, 50],
+      "translation": [0, 10.6, 1.5],
+      "scale": [1.7, 1.7, 1.7]
+    },
+    "thirdperson_lefthand": {
+      "rotation": [0, 135, -50],
+      "translation": [0, 10.6, 1.5],
+      "scale": [1.7, 1.7, 1.7]
+    },
+    "firstperson_righthand": {
+      "rotation": [0, -135, 22],
+      "translation": [3.3, 10.6, 3.3],
+      "scale": [1.7, 1.7, 1.7]
+    },
+    "firstperson_lefthand": {
+      "rotation": [0, 135, -22],
+      "translation": [3.3, 10.6, 3.3],
+      "scale": [1.7, 1.7, 1.7]
+    }
+  },
+  "textures": {
+    "layer0": "wanderers_haven:item/diamond_greatsword"
+  }
+}

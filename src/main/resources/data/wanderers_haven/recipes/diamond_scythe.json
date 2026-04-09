@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " M ",
+    " M ",
+    " S "
+  ],
+  "key": {
+    "M": { "item": "minecraft:diamond" },
+    "S": { "item": "minecraft:stick" }
+  },
+  "result": { "id": "wanderers_haven:diamond_scythe", "count": 1 }
+}
