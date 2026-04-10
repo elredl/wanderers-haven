@@ -1,5 +1,9 @@
 package com.wanderershaven.skill;
 
+import static com.wanderershaven.skill.SkillDefs.activeUpgrade;
+import static com.wanderershaven.skill.SkillDefs.passive;
+import static com.wanderershaven.skill.SkillDefs.upgrade;
+
 import com.wanderershaven.classsystem.evolution.EvolutionSkillSet;
 import java.util.List;
 
@@ -10,8 +14,12 @@ import java.util.List;
  * {@link com.wanderershaven.classsystem.ClassSystemBootstrap} and tagged as exclusive
  * to {@code "warrior_berserker"} — they never appear in any other warrior's roll pool.
  *
- * Notable interaction:
- *   Fighting Spirit is a standalone Berserker-exclusive trigger skill.
+ * Upgrade chains of note:
+ *   Battle Cry (Weak) -> Mocking Shout
+ *   Piercing Charge -> Spinning Slash
+ *   Berserker Rage -> Enhanced Berserker Rage
+ *   Heavy Strikes -> Savage Onslaught
+ *   Bludgeon -> Fury Becomes Flesh
  */
 public final class BerserkerSkills {
 
@@ -21,7 +29,8 @@ public final class BerserkerSkills {
 	// Granted the moment the player accepts the Berserker evolution.
 	// Replaces the guaranteed skill roll that would otherwise fire at level 25.
 
-	private static final SkillDefinition BERSERKER_RAGE = skill(
+	private static final SkillDefinition BERSERKER_RAGE = passive(
+		CLASS,
 		"berserker_rage", 3,
 		"Berserker Rage",
 		"Your pain is your power. The lower your health, the more damage you deal — "
@@ -31,20 +40,56 @@ public final class BerserkerSkills {
 	// ── Exclusive roll pool ───────────────────────────────────────────────────
 	// Enter the roll pool only for players who have accepted the Berserker evolution.
 
-	private static final SkillDefinition FIGHTING_SPIRIT = skill(
-		"fighting_spirit", 3,
-		"Fighting Spirit",
-		"Adversity only makes you sharper. When you drop to 40% health, gain 50% damage resistance "
-			+ "for 30 seconds. (5 min cooldown)"
+	private static final SkillDefinition BATTLE_FURY = passive(
+		CLASS,
+		"battle_fury", 3,
+		"Battle Fury",
+		"Each successful attack grants 5 Fury (up to 100). Every Fury grants +0.3% critical strike chance."
 	);
 
-	/** Dual passive/active: stores incoming damage as Fury, then burns it for size and power. */
-	private static final SkillDefinition FURY_UNLEASHED = activeSkill(
-		"fury_unleashed", 4,
-		"Fury Unleashed",
-		"Passive: Every point of damage you take is stored as Fury (up to 100 points). "
-			+ "Active: Consume all stored Fury — for each point spent, gain 1% bonus damage and grow slightly "
-			+ "for 1 minute. (15 min cooldown)"
+	private static final SkillDefinition MOCKING_SHOUT = activeUpgrade(
+		CLASS,
+		"mocking_shout", 3,
+		"Mocking Shout",
+		"Shout at all enemies in range, forcing their attention onto you. They deal 30% less damage "
+			+ "and are slowed by 20%. (45 sec cooldown)",
+		"battle_cry_weak"
+	);
+
+	private static final SkillDefinition SPINNING_SLASH = activeUpgrade(
+		CLASS,
+		"spinning_slash", 3,
+		"Spinning Slash",
+		"Dash 8 blocks forward, carving through nearby enemies during the charge for 200% weapon damage. "
+			+ "(20 sec cooldown)",
+		"piercing_charge"
+	);
+
+	private static final SkillDefinition ENHANCED_BERSERKER_RAGE = upgrade(
+		CLASS,
+		"enhanced_berserker_rage", 4,
+		"Enhanced Berserker Rage",
+		"Builds on Berserker Rage. Keep up to +50% damage from missing health and also gain up to "
+			+ "+30% attack speed at half a heart.",
+		"berserker_rage"
+	);
+
+	private static final SkillDefinition SAVAGE_ONSLAUGHT = activeUpgrade(
+		CLASS,
+		"savage_onslaught", 4,
+		"Savage Onslaught",
+		"Embrace reckless aggression for 10 seconds: take 30% more damage, but gain +30% damage, +20% "
+			+ "attack speed, and your strikes bypass 15% armor and damage resistance. (30 sec cooldown)",
+		"heavy_strikes"
+	);
+
+	private static final SkillDefinition FURY_BECOMES_FLESH = activeUpgrade(
+		CLASS,
+		"fury_becomes_flesh", 4,
+		"Fury Becomes Flesh",
+		"Release a close-range blast that damages and knocks back enemies within 2 blocks, then consume all "
+			+ "stored Fury to heal 0.5% max health per Fury. (15 sec cooldown)",
+		"bludgeon"
 	);
 
 	private BerserkerSkills() {}
@@ -56,7 +101,17 @@ public final class BerserkerSkills {
 	 * capstone + all exclusive skills for this path.
 	 */
 	public static EvolutionSkillSet skillSet() {
-		return new EvolutionSkillSet(BERSERKER_RAGE, List.of(FIGHTING_SPIRIT, FURY_UNLEASHED));
+		return new EvolutionSkillSet(
+			BERSERKER_RAGE,
+			List.of(
+				BATTLE_FURY,
+				MOCKING_SHOUT,
+				SPINNING_SLASH,
+				ENHANCED_BERSERKER_RAGE,
+				SAVAGE_ONSLAUGHT,
+				FURY_BECOMES_FLESH
+			)
+		);
 	}
 
 	/**
@@ -64,17 +119,14 @@ public final class BerserkerSkills {
 	 * in the skill engine at startup.
 	 */
 	public static List<SkillDefinition> all() {
-		return List.of(BERSERKER_RAGE, FIGHTING_SPIRIT, FURY_UNLEASHED);
+		return List.of(
+			BERSERKER_RAGE,
+			BATTLE_FURY,
+			MOCKING_SHOUT,
+			SPINNING_SLASH,
+			ENHANCED_BERSERKER_RAGE,
+			SAVAGE_ONSLAUGHT,
+			FURY_BECOMES_FLESH
+		);
 	}
-
-	// ── Helpers ───────────────────────────────────────────────────────────────
-
-	private static SkillDefinition skill(String id, int powerLevel, String displayName, String description) {
-		return SkillDefs.passive(CLASS, id, powerLevel, displayName, description);
-	}
-
-	private static SkillDefinition activeSkill(String id, int powerLevel, String displayName, String description) {
-		return SkillDefs.active(CLASS, id, powerLevel, displayName, description);
-	}
-
 }

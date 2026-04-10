@@ -40,7 +40,22 @@ public final class SkillStatTable {
 		engine.register("greater_strength",
 			StatContribution.always(Attributes.ATTACK_DAMAGE, id("greater_strength"),
 				0.35, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
-				p -> owns(p, "greater_strength")));
+				p -> owns(p, "greater_strength") && !owns(p, "immense_strength")));
+
+		engine.register("immense_strength",
+			StatContribution.always(Attributes.ATTACK_DAMAGE, id("immense_strength"),
+				0.50, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "immense_strength") && !owns(p, "legendary_strength")));
+
+		engine.register("legendary_strength",
+			StatContribution.always(Attributes.ATTACK_DAMAGE, id("legendary_strength"),
+				0.62, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "legendary_strength") && !owns(p, "mythic_strength")));
+
+		engine.register("mythic_strength",
+			StatContribution.always(Attributes.ATTACK_DAMAGE, id("mythic_strength"),
+				0.77, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "mythic_strength")));
 
 		// Lesser Dexterity / Enhanced Dexterity
 		engine.register("lesser_dexterity",
@@ -56,7 +71,22 @@ public final class SkillStatTable {
 		engine.register("greater_dexterity",
 			StatContribution.always(Attributes.ATTACK_SPEED, id("greater_dexterity"),
 				0.28, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
-				p -> owns(p, "greater_dexterity")));
+				p -> owns(p, "greater_dexterity") && !owns(p, "immense_dexterity")));
+
+		engine.register("immense_dexterity",
+			StatContribution.always(Attributes.ATTACK_SPEED, id("immense_dexterity"),
+				0.40, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "immense_dexterity") && !owns(p, "legendary_dexterity")));
+
+		engine.register("legendary_dexterity",
+			StatContribution.always(Attributes.ATTACK_SPEED, id("legendary_dexterity"),
+				0.50, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "legendary_dexterity") && !owns(p, "mythic_dexterity")));
+
+		engine.register("mythic_dexterity",
+			StatContribution.always(Attributes.ATTACK_SPEED, id("mythic_dexterity"),
+				0.65, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "mythic_dexterity")));
 
 		// Lesser Speed / Enhanced Speed
 		engine.register("lesser_speed",
@@ -72,13 +102,121 @@ public final class SkillStatTable {
 		engine.register("greater_speed",
 			StatContribution.always(Attributes.MOVEMENT_SPEED, id("greater_speed"),
 				0.28, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
-				p -> owns(p, "greater_speed")));
+				p -> owns(p, "greater_speed") && !owns(p, "immense_speed")));
+
+		engine.register("immense_speed",
+			StatContribution.always(Attributes.MOVEMENT_SPEED, id("immense_speed"),
+				0.40, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "immense_speed") && !owns(p, "legendary_speed")));
+
+		engine.register("legendary_speed",
+			StatContribution.always(Attributes.MOVEMENT_SPEED, id("legendary_speed"),
+				0.50, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "legendary_speed") && !owns(p, "mythic_speed")));
+
+		engine.register("mythic_speed",
+			StatContribution.always(Attributes.MOVEMENT_SPEED, id("mythic_speed"),
+				0.65, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "mythic_speed")));
 
 		// Lightfooted — +15% movement speed while in combat
 		engine.register("lightfooted",
 			StatContribution.always(Attributes.MOVEMENT_SPEED, id("lightfooted"),
 				0.15, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
-				p -> owns(p, "lightfooted") && SkillEffectService.isInCombat(p)));
+				p -> owns(p, "lightfooted")
+					&& !owns(p, "fleetfooted")
+					&& !owns(p, "battlefield_unmatched_mobility")
+					&& SkillEffectService.isInCombat(p)));
+
+		engine.register("fleetfooted",
+			StatContribution.always(Attributes.MOVEMENT_SPEED, id("fleetfooted"),
+				0.20, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "fleetfooted")
+					&& !owns(p, "battlefield_unmatched_mobility")
+					&& SkillEffectService.isInCombat(p)));
+
+		engine.register("battlefield_unmatched_mobility",
+			StatContribution.always(Attributes.MOVEMENT_SPEED, id("battlefield_unmatched_mobility"),
+				0.30, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "battlefield_unmatched_mobility") && SkillEffectService.isInCombat(p)));
+
+		// Fortitude / Greater Fortitude — permanent max-health increase
+		engine.register("fortitude",
+			StatContribution.always(Attributes.MAX_HEALTH, id("fortitude_health"),
+				6.0, AttributeModifier.Operation.ADD_VALUE,
+				p -> owns(p, "fortitude") && !owns(p, "greater_fortitude")));
+
+		engine.register("greater_fortitude",
+			StatContribution.always(Attributes.MAX_HEALTH, id("greater_fortitude_health"),
+				12.0, AttributeModifier.Operation.ADD_VALUE,
+				p -> owns(p, "greater_fortitude") && !owns(p, "perfect_constitution")));
+
+		engine.register("perfect_constitution",
+			StatContribution.always(Attributes.MAX_HEALTH, id("perfect_constitution_health"),
+				20.0, AttributeModifier.Operation.ADD_VALUE,
+				p -> owns(p, "perfect_constitution") && !owns(p, "giants_constitution")));
+
+		engine.register("giants_constitution",
+			StatContribution.always(Attributes.MAX_HEALTH, id("giants_constitution_health"),
+				40.0, AttributeModifier.Operation.ADD_VALUE,
+				p -> owns(p, "giants_constitution") && !owns(p, "divinity_incarnate")));
+
+		engine.register("divinity_incarnate",
+			StatContribution.always(Attributes.MAX_HEALTH, id("divinity_incarnate_health"),
+				80.0, AttributeModifier.Operation.ADD_VALUE,
+				p -> owns(p, "divinity_incarnate")));
+
+		// Battle-Hardened — +5% multiplicative boost to core combat stats
+		engine.register("battle_hardened",
+			StatContribution.always(Attributes.ATTACK_DAMAGE, id("battle_hardened_damage"),
+				0.05, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "battle_hardened")),
+			StatContribution.always(Attributes.ATTACK_SPEED, id("battle_hardened_speed"),
+				0.05, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "battle_hardened")),
+			StatContribution.always(Attributes.MOVEMENT_SPEED, id("battle_hardened_move"),
+				0.05, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "battle_hardened")),
+			StatContribution.always(Attributes.MAX_HEALTH, id("battle_hardened_health"),
+				0.05, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "battle_hardened")),
+			StatContribution.always(Attributes.ARMOR, id("battle_hardened_armor"),
+				0.05, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "battle_hardened") && !owns(p, "body_of_galas")));
+
+		engine.register("body_of_galas",
+			StatContribution.always(Attributes.ATTACK_DAMAGE, id("body_of_galas_damage"),
+				0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "body_of_galas")),
+			StatContribution.always(Attributes.ATTACK_SPEED, id("body_of_galas_speed"),
+				0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "body_of_galas")),
+			StatContribution.always(Attributes.MOVEMENT_SPEED, id("body_of_galas_move"),
+				0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "body_of_galas")),
+			StatContribution.always(Attributes.MAX_HEALTH, id("body_of_galas_health"),
+				0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "body_of_galas")),
+			StatContribution.always(Attributes.ARMOR, id("body_of_galas_armor"),
+				0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "body_of_galas") && !owns(p, "transcendent_form")));
+
+		engine.register("transcendent_form",
+			StatContribution.always(Attributes.ATTACK_DAMAGE, id("transcendent_form_damage"),
+				0.15, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "transcendent_form")),
+			StatContribution.always(Attributes.ATTACK_SPEED, id("transcendent_form_speed"),
+				0.15, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "transcendent_form")),
+			StatContribution.always(Attributes.MOVEMENT_SPEED, id("transcendent_form_move"),
+				0.15, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "transcendent_form")),
+			StatContribution.always(Attributes.MAX_HEALTH, id("transcendent_form_health"),
+				0.35, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "transcendent_form")),
+			StatContribution.always(Attributes.ARMOR, id("transcendent_form_armor"),
+				0.15, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> owns(p, "transcendent_form")));
 
 		// Stand Your Ground — permanent knockback immunity
 		engine.register("stand_your_ground",
@@ -88,12 +226,18 @@ public final class SkillStatTable {
 
 		// ── Dynamic (amount recalculated each tick) ────────────────────────────
 
-		// Berserker Rage — 0% bonus at full health → 50% at 1 HP
+		// Berserker Rage / Enhanced Berserker Rage — 0% bonus at full health -> 50% at 1 HP
 		engine.register("berserker_rage",
 			StatContribution.dynamic(Attributes.ATTACK_DAMAGE, id("berserker_rage"),
 				AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
 				SkillStatTable::berserkerRageAmount,
-				p -> owns(p, "berserker_rage")));
+				p -> owns(p, "berserker_rage") || owns(p, "enhanced_berserker_rage")));
+
+		engine.register("enhanced_berserker_rage",
+			StatContribution.dynamic(Attributes.ATTACK_SPEED, id("enhanced_berserker_rage_speed"),
+				AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				SkillStatTable::enhancedBerserkerRageSpeedAmount,
+				p -> owns(p, "enhanced_berserker_rage")));
 
 		// ── Conditional (weapon-gated, rechecked each tick) ───────────────────
 
@@ -143,6 +287,15 @@ public final class SkillStatTable {
 			StatContribution.always(Attributes.ATTACK_SPEED, id("maddening_strikes_speed"),
 				0.30, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
 				p -> engine.isSourceActive(p.getUUID(), "maddening_strikes_buff")));
+
+		// Savage Onslaught — +30% damage and +20% attack speed for 10 seconds
+		engine.register("savage_onslaught_buff",
+			StatContribution.always(Attributes.ATTACK_DAMAGE, id("savage_onslaught_damage"),
+				0.30, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> engine.isSourceActive(p.getUUID(), "savage_onslaught_buff")),
+			StatContribution.always(Attributes.ATTACK_SPEED, id("savage_onslaught_speed"),
+				0.20, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> engine.isSourceActive(p.getUUID(), "savage_onslaught_buff")));
 
 		// Last Stand — +8% or +12% damage+speed for 10 seconds (amount set at activation)
 		engine.register("last_stand_buff",
@@ -195,6 +348,12 @@ public final class SkillStatTable {
 			StatContribution.always(Attributes.MOVEMENT_SPEED, id("shadow_step_speed"),
 				0.50, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
 				p -> engine.isSourceActive(p.getUUID(), "shadow_step_buff")));
+
+		// Battlefield: Unmatched Mobility — +15% speed for 4s after each hit
+		engine.register("battlefield_mobility_attack_buff",
+			StatContribution.always(Attributes.MOVEMENT_SPEED, id("battlefield_mobility_attack_speed"),
+				0.15, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> engine.isSourceActive(p.getUUID(), "battlefield_mobility_attack_buff")));
 	}
 
 	// ── Private helpers ────────────────────────────────────────────────────────
@@ -215,6 +374,14 @@ public final class SkillStatTable {
 		float hp    = player.getHealth();
 		float span  = maxHp - 1.0f;
 		return (span > 0) ? Math.min(0.5, 0.5 * (maxHp - hp) / span) : 0.0;
+	}
+
+	/** Enhanced Berserker Rage: 0% at full health, 30% at 1 HP, clamped. */
+	private static double enhancedBerserkerRageSpeedAmount(ServerPlayer player) {
+		float maxHp = player.getMaxHealth();
+		float hp    = player.getHealth();
+		float span  = maxHp - 1.0f;
+		return (span > 0) ? Math.min(0.3, 0.3 * (maxHp - hp) / span) : 0.0;
 	}
 
 	private static boolean isDuelistWeapon(ServerPlayer player) {

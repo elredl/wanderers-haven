@@ -88,7 +88,13 @@ public abstract class LivingEntitySkillMixin {
 			// Pre-application damage reduction (same mechanic as Projectile Protection)
 			float mult = SkillEffectService.getDamageMultiplier(player, source);
 			float finalAmount = amount * mult;
+			if (SkillEffectService.tryAvoidDeath(player, finalAmount)) {
+				return false;
+			}
 			boolean applied = original.call(level, source, finalAmount);
+			if (applied) {
+				SkillEffectService.tryDiamondSkinReflect(player, source, finalAmount);
+			}
 			if (attackingPlayer != null) {
 				SkillEffectService.markInCombat(attackingPlayer);
 				if (applied && finalAmount > 0.0f) {
@@ -145,8 +151,14 @@ public abstract class LivingEntitySkillMixin {
 				|| effect.getEffect() == MobEffects.SLOWNESS) {
 			mult = SkillEffectService.getMagicDebuffDurationMultiplier(player);
 		}
+		if (effect.getEffect() == MobEffects.SLOWNESS) {
+			mult *= SkillEffectService.getSlowAndStunDurationMultiplier(player);
+		}
 		if (mult >= 1.0f) return effect;
-		int shorter = Math.max(1, (int) (effect.getDuration() * mult));
+		int shorter = (int) (effect.getDuration() * mult);
+		if (shorter <= 0) {
+			shorter = 0;
+		}
 		return new MobEffectInstance(
 			effect.getEffect(), shorter, effect.getAmplifier(),
 			effect.isAmbient(), effect.isVisible(), effect.showIcon()

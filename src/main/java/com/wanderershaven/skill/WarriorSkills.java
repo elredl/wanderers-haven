@@ -46,10 +46,6 @@ public final class WarriorSkills {
 				"Minor Poison Resistance",
 				"Your body has built up a tolerance to toxins. Poison effects last 10% shorter on you."),
 
-			skill("slow_metabolism", 1,
-				"Slow Metabolism",
-				"Years of campaign rations have trained your body to make do with less. Hunger depletes 10% slower."),
-
 			activeSkill("heavy_strikes", 1,
 				"Heavy Strikes",
 				"You channel your strength into every blow. Activate to deal 12% more damage for 10 seconds. (30 sec cooldown)"),
@@ -150,6 +146,10 @@ public final class WarriorSkills {
 				"Lesser Resistance: Magic",
 				"Weakness, Nausea, and Slowness effects last 10% shorter on you."),
 
+			skill("fortitude", 3,
+				"Fortitude",
+				"Gain 3 permanent hearts."),
+
 			// -----------------------------------------------------------------
 			// PW4 -- Strong upgrades that lock in a build.
 			// -----------------------------------------------------------------
@@ -197,10 +197,299 @@ public final class WarriorSkills {
 				"Builds on Lesser Resistance: Bludgeoning. Take 18% less damage from bludgeoning weapons and unarmed attacks.",
 				"lesser_resistance_bludgeoning"),
 
+			upgrade("enhanced_resistance_piercing", 4,
+				"Enhanced Resistance: Piercing",
+				"Builds on Lesser Resistance: Piercing. Take 18% less damage from piercing weapons.",
+				"lesser_resistance_piercing"),
+
 			upgrade("critical_rhythm", 4,
 				"Critical Rhythm",
 				"Builds on Critical Hits. Start at 10% crit chance, then gain +2% per successful hit up to 20%. Crits deal 150% damage.",
-				"critical_hits")
+				"critical_hits"),
+
+			// -----------------------------------------------------------------
+			// PW5 -- Heavy hitters and high-end survivability.
+			// -----------------------------------------------------------------
+			upgrade("greater_critical_rhythm", 5,
+				"Greater Critical Rhythm",
+				"Builds on Critical Rhythm. Crit chance starts at 10% and gains +1% per successful hit, up to 30%. Crits deal 150% damage.",
+				"critical_rhythm"),
+
+			skill("killing_blow", 5,
+				"Killing Blow",
+				"Deal 30% more damage to enemies under 20% health."),
+
+			upgrade("greater_fortitude", 5,
+				"Greater Fortitude",
+				"Builds on Fortitude. Gain 6 permanent hearts.",
+				"fortitude"),
+
+			skill("avoid_death", 5,
+				"Avoid Death",
+				"The first time a killing blow would land in battle, survive and recover 20% health. (5 min cooldown)"),
+
+			upgrade("greater_first_strike", 5,
+				"Greater First Strike",
+				"Builds on First Strike. Your opening hit against an enemy deals 45% more damage.",
+				"first_strike"),
+
+			upgrade("wound_regeneration", 5,
+				"Wound Regeneration",
+				"Builds on Wound Closure. Regenerate health faster while in combat.",
+				"wound_closure"),
+
+			upgrade("diamond_skin", 5,
+				"Diamond Skin",
+				"Builds on Iron Skin. Take 20% less damage from all sources and gain a 10% chance to reflect 20% of incoming damage.",
+				"iron_skin"),
+
+			skill("battle_hardened", 5,
+				"Battle-Hardened",
+				"Gain 5% multiplicative power to your core combat stats."),
+
+			skill("intimidating_aura", 5,
+				"Intimidating Aura",
+				"Enemies within 10 blocks move 10% slower, deal 10% less damage, and take 8% more damage."),
+
+			upgrade("precise_strikes", 5,
+				"Precise Strikes",
+				"Builds on Measured Strikes. Attacks have a 15% chance to bypass 30% armor and 15% damage reduction from skills.",
+				"measured_strikes"),
+
+			// -----------------------------------------------------------------
+			// PW6 -- Elite upgrades and hard counters.
+			// -----------------------------------------------------------------
+			upgrade("body_of_galas", 6,
+				"Body of Galas",
+				"Builds on Battle-Hardened. Gain 10% multiplicative power to your core combat stats.",
+				"battle_hardened"),
+
+			upgrade("immense_strength", 6,
+				"Immense Strength",
+				"Builds on Greater Strength. Melee attacks deal 50% more damage.",
+				"greater_strength"),
+
+			upgrade("immense_dexterity", 6,
+				"Immense Dexterity",
+				"Builds on Greater Dexterity. Gain 40% attack speed.",
+				"greater_dexterity"),
+
+			upgrade("immense_speed", 6,
+				"Immense Speed",
+				"Builds on Greater Speed. Gain 40% movement speed.",
+				"greater_speed"),
+
+			upgrade("immense_endurance", 6,
+				"Immense Endurance",
+				"Builds on Greater Endurance. Take 43% less damage from all sources.",
+				"greater_endurance"),
+
+			upgrade("greater_resistance_blades", 6,
+				"Greater Resistance: Blades",
+				"Builds on Enhanced Resistance: Blades. Take 28% less damage from slashing weapons.",
+				"enhanced_resistance_blades"),
+
+			upgrade("greater_resistance_bludgeoning", 6,
+				"Greater Resistance: Bludgeoning",
+				"Builds on Enhanced Resistance: Bludgeoning. Take 28% less damage from bludgeoning weapons and unarmed attacks.",
+				"enhanced_resistance_bludgeoning"),
+
+			upgrade("greater_resistance_piercing", 6,
+				"Greater Resistance: Piercing",
+				"Builds on Enhanced Resistance: Piercing. Take 28% less damage from piercing weapons.",
+				"enhanced_resistance_piercing"),
+
+			upgrade("greater_resistance_magic", 6,
+				"Greater Resistance: Magic",
+				"Builds on Enhanced Resistance: Magic. Weakness, Nausea, and Slowness effects last 28% shorter on you.",
+				"enhanced_resistance_magic"),
+
+			upgrade("greater_resistance_elements", 6,
+				"Greater Resistance: Elements",
+				"Builds on Lesser Resistance: Elements. Take 20% less damage from elemental sources.",
+				"lesser_resistance_elements"),
+
+			upgrade("poison_immunity", 6,
+				"Poison Immunity",
+				"Builds on Enhanced Poison Resistance. Poison no longer damages you.",
+				"enhanced_poison_resistance"),
+
+			skill("indomitable", 6,
+				"Indomitable",
+				"Slows and stuns are reduced by 50% on you."),
+
+			upgrade("perfect_constitution", 6,
+				"Perfect Constitution",
+				"Builds on Greater Fortitude. Gain 10 permanent hearts.",
+				"greater_fortitude"),
+
+			skill("fleetfooted", 6,
+				"Fleetfooted",
+				"Builds on Lightfooted. Gain 20% movement speed and stronger jump power while in combat."),
+
+			// -----------------------------------------------------------------
+			// PW7 -- Mythic tier upgrades.
+			// -----------------------------------------------------------------
+			upgrade("titanic_resistance_blades", 7,
+				"Titanic Resistance: Blades",
+				"Builds on Greater Resistance: Blades. Take 36% less damage from slashing weapons.",
+				"greater_resistance_blades"),
+
+			upgrade("titanic_resistance_bludgeoning", 7,
+				"Titanic Resistance: Bludgeoning",
+				"Builds on Greater Resistance: Bludgeoning. Take 36% less damage from bludgeoning weapons and unarmed attacks.",
+				"greater_resistance_bludgeoning"),
+
+			upgrade("titanic_resistance_piercing", 7,
+				"Titanic Resistance: Piercing",
+				"Builds on Greater Resistance: Piercing. Take 36% less damage from piercing weapons.",
+				"greater_resistance_piercing"),
+
+			upgrade("titanic_resistance_magic", 7,
+				"Titanic Resistance: Magic",
+				"Builds on Greater Resistance: Magic. Weakness, Nausea, and Slowness effects last 36% shorter on you.",
+				"greater_resistance_magic"),
+
+			upgrade("titanic_resistance_elements", 7,
+				"Titanic Resistance: Elements",
+				"Builds on Greater Resistance: Elements. Take 28% less damage from elemental sources.",
+				"greater_resistance_elements"),
+
+			upgrade("giants_constitution", 7,
+				"Giant's Constitution",
+				"Builds on Perfect Constitution. Gain 20 permanent hearts.",
+				"perfect_constitution"),
+
+			upgrade("perception_nothing_slips_my_grasp", 7,
+				"Perception: Nothing Slips My Grasp",
+				"Builds on Greater Dangersense. Keep all prior effects and reduce damage from attacks behind you by 50%.",
+				"greater_dangersense"),
+
+			upgrade("skin_of_adamantium", 7,
+				"Skin of Adamantium",
+				"Builds on Diamond Skin. Take 25% less damage from all sources and 40% less magic damage (currently potion harming and enchant-style sources), while still reflecting damage.",
+				"diamond_skin"),
+
+			upgrade("battlefield_unmatched_mobility", 7,
+				"Battlefield: Unmatched Mobility",
+				"Builds on Fleetfooted. Gain +10% additional speed in combat, 2x jump boost, and each hit grants +15% movement speed for 4 seconds.",
+				"fleetfooted"),
+
+			// -----------------------------------------------------------------
+			// PW8 -- Apex physical mastery.
+			// -----------------------------------------------------------------
+			upgrade("legendary_strength", 8,
+				"Legendary Strength",
+				"Builds on Immense Strength. Melee attacks deal 62% more damage.",
+				"immense_strength"),
+
+			upgrade("legendary_dexterity", 8,
+				"Legendary Dexterity",
+				"Builds on Immense Dexterity. Gain 50% attack speed.",
+				"immense_dexterity"),
+
+			upgrade("legendary_speed", 8,
+				"Legendary Speed",
+				"Builds on Immense Speed. Gain 50% movement speed.",
+				"immense_speed"),
+
+			upgrade("legendary_endurance", 8,
+				"Legendary Endurance",
+				"Builds on Immense Endurance. Take 53% less damage from all sources.",
+				"immense_endurance"),
+
+			upgrade("transcendent_form", 8,
+				"Transcendent Form",
+				"Builds on Body of Galas. Gain 15% multiplicative power to all core combat stats and +20% max health.",
+				"body_of_galas"),
+
+			upgrade("perfect_appraisal", 8,
+				"Perfect Appraisal",
+				"Builds on Lesser Appraisal. See health, class info, and level of any enemy regardless of level, and deal 30% more damage to enemies at least 3 levels below you.",
+				"lesser_appraisal"),
+
+			upgrade("the_first_blow_decides_it", 8,
+				"The First Blow Decides It",
+				"Builds on Greater First Strike. Your first hit against an enemy deals 300% damage.",
+				"greater_first_strike"),
+
+			upgrade("my_body_fears_no_wounds", 8,
+				"My Body Fears No Wounds",
+				"Builds on Wound Regeneration. Regenerate much faster while in combat.",
+				"wound_regeneration"),
+
+			upgrade("my_strikes_stop_for_nothing", 8,
+				"My Strikes Stop for Nothing",
+				"Builds on Precise Strikes. Attacks have a 15% chance to bypass 50% armor and 50% damage reduction from skills.",
+				"precise_strikes"),
+
+			// -----------------------------------------------------------------
+			// PW9 -- Divinity-tier combat mastery.
+			// -----------------------------------------------------------------
+			upgrade("mythic_strength", 9,
+				"Mythic Strength",
+				"Builds on Legendary Strength. Melee attacks deal 77% more damage.",
+				"legendary_strength"),
+
+			upgrade("mythic_dexterity", 9,
+				"Mythic Dexterity",
+				"Builds on Legendary Dexterity. Gain 65% attack speed.",
+				"legendary_dexterity"),
+
+			upgrade("mythic_speed", 9,
+				"Mythic Speed",
+				"Builds on Legendary Speed. Gain 65% movement speed.",
+				"legendary_speed"),
+
+			upgrade("mythic_endurance", 9,
+				"Mythic Endurance",
+				"Builds on Legendary Endurance. Take 68% less damage from all sources.",
+				"legendary_endurance"),
+
+			upgrade("divine_resistance_blades", 9,
+				"Divine Resistance: Blades",
+				"Builds on Titanic Resistance: Blades. Take 51% less damage from slashing weapons.",
+				"titanic_resistance_blades"),
+
+			upgrade("divine_resistance_bludgeoning", 9,
+				"Divine Resistance: Bludgeoning",
+				"Builds on Titanic Resistance: Bludgeoning. Take 51% less damage from bludgeoning weapons and unarmed attacks.",
+				"titanic_resistance_bludgeoning"),
+
+			upgrade("divine_resistance_piercing", 9,
+				"Divine Resistance: Piercing",
+				"Builds on Titanic Resistance: Piercing. Take 51% less damage from piercing weapons.",
+				"titanic_resistance_piercing"),
+
+			upgrade("divine_resistance_magic", 9,
+				"Divine Resistance: Magic",
+				"Builds on Titanic Resistance: Magic. Weakness, Nausea, and Slowness effects last 51% shorter on you.",
+				"titanic_resistance_magic"),
+
+			upgrade("divine_resistance_elements", 9,
+				"Divine Resistance: Elements",
+				"Builds on Titanic Resistance: Elements. Take 43% less damage from elemental sources.",
+				"titanic_resistance_elements"),
+
+			upgrade("the_universe_it_sings_for_me", 9,
+				"The Universe, It Sings for Me",
+				"Builds on Greater Critical Rhythm. Gain 5% crit chance per hit up to 80%. Critical hits deal 250% damage.",
+				"greater_critical_rhythm"),
+
+			upgrade("divinity_incarnate", 9,
+				"Divinity Incarnate",
+				"Builds on Giant's Constitution. Gain 40 permanent hearts.",
+				"giants_constitution"),
+
+			upgrade("my_will_imposed", 9,
+				"My Will, Imposed",
+				"Builds on Intimidating Aura. Non-boss mobs at least 10 levels below you are unable to move or attack within your aura.",
+				"intimidating_aura"),
+
+			upgrade("defy_the_final_call", 9,
+				"Defy the Final Call",
+				"Builds on Avoid Death. Once per combat, a killing blow instead restores full health and unleashes a shockwave that knocks back nearby enemies and damages them based on health restored.",
+				"avoid_death")
 		);
 	}
 
