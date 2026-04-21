@@ -22,5 +22,9 @@
   "item.wanderers_haven.iron_mace": "Iron Mace",
   "item.wanderers_haven.gold_mace": "Golden Mace",
   "item.wanderers_haven.diamond_mace": "Diamond Mace",
-  "item.wanderers_haven.netherite_mace": "Netherite Mace"
+  "item.wanderers_haven.netherite_mace": "Netherite Mace",
+  "item.wanderers_haven.quiver": "Quiver",
+  "item.wanderers_haven.twin_crossbow": "Twin Crossbow",
+  "item.wanderers_haven.shortbow_buckler": "Shortbow & Buckler",
+  "item.minecraft.bow": "Longbow"
 }

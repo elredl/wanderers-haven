@@ -61,6 +61,8 @@ public final class WeaponCategoryResolver {
 		if (path.endsWith("_greathammer")) return "mauler";
 		if (path.endsWith("_scythe")) return "scythe";
 		if (path.endsWith("_mace")) return "mauler";
+		if (path.endsWith("_crossbow")) return "ranged";
+		if (path.endsWith("_buckler")) return "ranged";
 
 		// ── Bladedancer ──────────────────────────────────────────────────────
 		// ── Duelist (vanilla swords) ──────────────────────────────────────────

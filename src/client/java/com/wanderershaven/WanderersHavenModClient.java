@@ -4,6 +4,7 @@ import com.wanderershaven.client.ClientSkillState;
 import com.wanderershaven.client.WanderersHavenKeybindings;
 import com.wanderershaven.client.screen.StatsScreen;
 import com.wanderershaven.client.animation.SkillAnimationHandler;
+import com.wanderershaven.client.hud.CrossbowAmmoHud;
 import com.wanderershaven.client.hud.DangersenseHud;
 import com.wanderershaven.client.screen.ClassSelectionScreen;
 import com.wanderershaven.client.screen.RadialSkillMenuScreen;
@@ -108,5 +109,6 @@ public class WanderersHavenModClient implements ClientModInitializer {
 		});
 
 		DangersenseHud.register();
+		CrossbowAmmoHud.register();
 	}
 }

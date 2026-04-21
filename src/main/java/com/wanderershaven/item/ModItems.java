@@ -44,6 +44,9 @@ public final class ModItems {
 	public static final Item GOLD_MACE = registerWeapon("gold_mace", ToolMaterial.GOLD, 7.0f, 1.5f);
 	public static final Item DIAMOND_MACE = registerWeapon("diamond_mace", ToolMaterial.DIAMOND, 7.0f, 1.5f);
 	public static final Item NETHERITE_MACE = registerWeapon("netherite_mace", ToolMaterial.NETHERITE, 7.0f, 1.5f);
+	public static final Item QUIVER = registerQuiver("quiver");
+	public static final Item TWIN_CROSSBOW = registerTwinCrossbow("twin_crossbow");
+	public static final Item SHORTBOW_BUCKLER = registerShortbowBuckler("shortbow_buckler");
 
 	private ModItems() {}
 
@@ -73,14 +76,38 @@ public final class ModItems {
 			entries.accept(GOLD_MACE);
 			entries.accept(DIAMOND_MACE);
 			entries.accept(NETHERITE_MACE);
+			entries.accept(QUIVER);
+			entries.accept(TWIN_CROSSBOW);
+			entries.accept(SHORTBOW_BUCKLER);
 		});
-		WanderersHavenMod.LOGGER.info("Registered custom weapons");
+		WanderersHavenMod.LOGGER.info("Registered custom items");
 	}
 
 	private static Item registerWeapon(String id, ToolMaterial material, float damage, float attacksPerSecond) {
 		Identifier itemId = Identifier.fromNamespaceAndPath(WanderersHavenMod.MOD_ID, id);
 		ResourceKey<Item> key = ResourceKey.create(Registries.ITEM, itemId);
 		Item item = new AxeItem(material, damage, toAttackSpeedModifier(attacksPerSecond), new Item.Properties().setId(key));
+		return Registry.register(BuiltInRegistries.ITEM, itemId, item);
+	}
+
+	private static Item registerQuiver(String id) {
+		Identifier itemId = Identifier.fromNamespaceAndPath(WanderersHavenMod.MOD_ID, id);
+		ResourceKey<Item> key = ResourceKey.create(Registries.ITEM, itemId);
+		Item item = new QuiverItem(new Item.Properties().stacksTo(1).setId(key));
+		return Registry.register(BuiltInRegistries.ITEM, itemId, item);
+	}
+
+	private static Item registerTwinCrossbow(String id) {
+		Identifier itemId = Identifier.fromNamespaceAndPath(WanderersHavenMod.MOD_ID, id);
+		ResourceKey<Item> key = ResourceKey.create(Registries.ITEM, itemId);
+		Item item = new TwinCrossbowItem(new Item.Properties().stacksTo(1).durability(465).setId(key));
+		return Registry.register(BuiltInRegistries.ITEM, itemId, item);
+	}
+
+	private static Item registerShortbowBuckler(String id) {
+		Identifier itemId = Identifier.fromNamespaceAndPath(WanderersHavenMod.MOD_ID, id);
+		ResourceKey<Item> key = ResourceKey.create(Registries.ITEM, itemId);
+		Item item = new ShortbowBucklerItem(new Item.Properties().stacksTo(1).durability(430).setId(key));
 		return Registry.register(BuiltInRegistries.ITEM, itemId, item);
 	}
 

@@ -4,8 +4,11 @@
 	"compatibilityLevel": "JAVA_21",
 	"mixins": [
 		"WanderersHavenMixin",
+		"BowItemLongbowMixin",
 		"LivingEntitySkillMixin",
-		"PlayerSkillMixin"
+		"PlayerSkillMixin",
+		"TwinCrossbowHandsMixin",
+		"VanillaCrossbowMagazineMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
