@@ -59,6 +59,7 @@ public final class SkillEffectService {
 	public static final Identifier MADDENING_ARMOR_MOD   = Identifier.fromNamespaceAndPath("wanderers_haven", "maddening_armor");
 	public static final Identifier INTIMIDATING_AURA_SLOW_MOD = Identifier.fromNamespaceAndPath("wanderers_haven", "intimidating_aura_slow");
 	public static final Identifier MOCKING_SHOUT_SLOW_MOD = Identifier.fromNamespaceAndPath("wanderers_haven", "mocking_shout_slow");
+	public static final Identifier TERRORIZING_HOWL_FEAR_SLOW_MOD = Identifier.fromNamespaceAndPath("wanderers_haven", "terrorizing_howl_fear_slow");
 
 	// ── Cooldown / duration constants ─────────────────────────────────────────
 
@@ -84,10 +85,14 @@ public final class SkillEffectService {
 	private static final long CRUSHING_LEAP_AIR_WINDOW_TICKS     =    80L;
 	private static final long MOCKING_SHOUT_COOLDOWN_TICKS       =   900L;
 	private static final long MOCKING_SHOUT_DURATION_TICKS       =   160L;
+	private static final long TERRORIZING_HOWL_FEAR_TICKS        =    60L;
 	private static final long SPINNING_SLASH_COOLDOWN_TICKS      =   400L;
+	private static final long FURY_DECAY_INTERVAL_TICKS          =    20L;
+	private static final long OVERCLOCK_SUSTAIN_TICKS            =   100L;
 	private static final long SAVAGE_ONSLAUGHT_COOLDOWN_TICKS    =   600L;
 	private static final long SAVAGE_ONSLAUGHT_DURATION_TICKS    =   200L;
 	private static final long FURY_BECOMES_FLESH_COOLDOWN_TICKS  =   300L;
+	private static final long FURY_NOW_BLESSING_DURATION_TICKS   =   200L;
 	private static final long FURY_UNLEASHED_COOLDOWN_TICKS      = 18_000L;
 	private static final long FURY_UNLEASHED_DURATION_TICKS      = 1_200L;
 	private static final long SMITE_COOLDOWN_TICKS               =   400L;
@@ -125,6 +130,7 @@ public final class SkillEffectService {
 	private static final String EFX_HEAVY_STRIKES = "heavy_strikes";
 	private static final String EFX_MADDENING_STRIKES = "maddening_strikes";
 	private static final String EFX_SAVAGE_ONSLAUGHT = "savage_onslaught";
+	private static final String EFX_FURY_NOW_BLESSING = "fury_now_blessing";
 	private static final String EFX_FURY_UNLEASHED = "fury_unleashed";
 	private static final String EFX_FOCUS = "focus";
 	private static final String EFX_PARRY_WINDOW = "parry_window";
@@ -144,6 +150,9 @@ public final class SkillEffectService {
 	// ── State maps ────────────────────────────────────────────────────────────
 
 	private static final Map<UUID, Float> furyPoints                  = new ConcurrentHashMap<>();
+	private static final Map<UUID, Long> furyDecayLastTickAt          = new ConcurrentHashMap<>();
+	private static final Map<UUID, Double> furyBlessingCritChanceBonus = new ConcurrentHashMap<>();
+	private static final Map<UUID, Double> furyBlessingCritDamageBonus = new ConcurrentHashMap<>();
 	private static final Map<UUID, Set<UUID>> danceOfTheButterflyHitEntities = new ConcurrentHashMap<>();
 	private static final Map<UUID, Long> crushingLeapPendingLanding   = new ConcurrentHashMap<>();
 	private static final Map<UUID, Long> crushingLeapNoFallUntil      = new ConcurrentHashMap<>();
@@ -160,6 +169,8 @@ public final class SkillEffectService {
 	private static final Map<UUID, BleedState> bleedingTargets        = new ConcurrentHashMap<>();
 	private static final Map<UUID, Map<UUID, Integer>> maddeningArmorStacks = new ConcurrentHashMap<>();
 	private static final Map<UUID, GrasscutterFollowup> grasscutterFollowups = new ConcurrentHashMap<>();
+	private static final Map<UUID, FearState> fearedEntities          = new ConcurrentHashMap<>();
+	private static final Map<UUID, Long> overclockSustainUntil        = new ConcurrentHashMap<>();
 	private static final Set<UUID> defyFinalCallUsedInCombat           = ConcurrentHashMap.newKeySet();
 
 	// Stun (Shield Bash)
@@ -167,6 +178,7 @@ public final class SkillEffectService {
 
 	private record BleedState(long expiresAt, long nextTickAt, float perTickDamage) {}
 	private record GrasscutterFollowup(long executeAt, float damage) {}
+	private record FearState(UUID sourcePlayerId, long fearEndsAt) {}
 
 	// ── Registration ──────────────────────────────────────────────────────────
 
@@ -184,6 +196,10 @@ public final class SkillEffectService {
 			(entity, source, baseDamage, actualDamage, blocked) -> {
 				if (!(entity instanceof ServerPlayer player)) return;
 				incrementSygStack(player);
+				Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
+				if (actualDamage > 0.0f && skills.contains("pain_fuels_me")) {
+					addFury(player, actualDamage * 0.15f, skills);
+				}
 				float ratio = player.getHealth() / player.getMaxHealth();
 				if (ratio < 0.4f) {
 					trySecondWind(player);
@@ -353,6 +369,23 @@ public final class SkillEffectService {
 			}
 		});
 
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			for (Map.Entry<UUID, TimedEffectTracker.Window> entry : EFFECTS.snapshot(EFX_FURY_NOW_BLESSING).entrySet()) {
+				ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
+				if (player == null) {
+					furyBlessingCritChanceBonus.remove(entry.getKey());
+					furyBlessingCritDamageBonus.remove(entry.getKey());
+					EFFECTS.clear(entry.getKey(), EFX_FURY_NOW_BLESSING);
+					continue;
+				}
+				if (player.level().getGameTime() >= entry.getValue().expiresAt()) {
+					furyBlessingCritChanceBonus.remove(player.getUUID());
+					furyBlessingCritDamageBonus.remove(player.getUUID());
+					EFFECTS.clear(player.getUUID(), EFX_FURY_NOW_BLESSING);
+				}
+			}
+		});
+
 		// Flash Step — expire speed buff
 		ServerTickEvents.END_SERVER_TICK.register(server -> {
 			for (Map.Entry<UUID, TimedEffectTracker.Window> entry : EFFECTS.snapshot(EFX_FLASH_STEP).entrySet()) {
@@ -511,6 +544,7 @@ public final class SkillEffectService {
 		// Base warrior combat-passive loop
 		ServerTickEvents.END_SERVER_TICK.register(server -> {
 			for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+				handleFuryDecay(player);
 				handleDangersense(player);
 				handleLightfootedJump(player);
 				handleWoundClosure(player);
@@ -523,6 +557,50 @@ public final class SkillEffectService {
 
 		// Entity stun (Shield Bash)
 		registerStunTick();
+
+		// Terrorizing Howl fear phase (flee, then transition into taunt/debuff phase)
+		ServerTickEvents.END_SERVER_TICK.register(server ->
+			fearedEntities.entrySet().removeIf(entry -> {
+				for (ServerLevel level : server.getAllLevels()) {
+					net.minecraft.world.entity.Entity raw = level.getEntity(entry.getKey());
+					if (!(raw instanceof LivingEntity enemy)) continue;
+					FearState state = entry.getValue();
+					long now = level.getGameTime();
+					if (now < state.fearEndsAt()) {
+						if (enemy instanceof Mob mob) {
+							net.minecraft.world.entity.Entity src = level.getEntity(state.sourcePlayerId());
+							if (src instanceof ServerPlayer source) {
+								Vec3 away = mob.position().subtract(source.position());
+								if (away.lengthSqr() < 0.0001) away = source.getLookAngle().scale(-1.0);
+								Vec3 flee = mob.position().add(away.normalize().scale(6.0));
+								mob.setTarget(null);
+								mob.getNavigation().moveTo(flee.x, mob.getY(), flee.z, 1.25);
+							}
+						}
+						return false;
+					}
+
+					net.minecraft.world.entity.Entity src = level.getEntity(state.sourcePlayerId());
+					if (src instanceof ServerPlayer source && source.level() == level) {
+						long expiresAt = now + MOCKING_SHOUT_DURATION_TICKS;
+						COMBAT_DEBUFFS.apply(enemy.getUUID(), expiresAt, 0.70f, 1.20f);
+						ATTRIBUTE_DEBUFFS.apply(
+							enemy,
+							Attributes.MOVEMENT_SPEED,
+							MOCKING_SHOUT_SLOW_MOD,
+							-0.20,
+							AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+							expiresAt
+						);
+						if (enemy instanceof Mob mob) {
+							mob.setTarget(source);
+						}
+					}
+					return true;
+				}
+				return true;
+			})
+		);
 	}
 
 	// ── Apply on join / skill grant ───────────────────────────────────────────
@@ -551,12 +629,16 @@ public final class SkillEffectService {
 		registry.register("maddening_strikes", SkillEffectService::executeMaddeningStrikes);
 		registry.register("battle_cry_weak", SkillEffectService::executeBattleCryWeak);
 		registry.register("mocking_shout", SkillEffectService::executeMockingShout);
+		registry.register("terrorizing_howl", SkillEffectService::executeTerrorizingHowl);
 		registry.register("bludgeon", SkillEffectService::executeBludgeon);
 		registry.register("fury_becomes_flesh", SkillEffectService::executeFuryBecomesFlesh);
+		registry.register("fury_now_blessing", SkillEffectService::executeFuryNowBlessing);
 		registry.register("ground_slam", SkillEffectService::executeGroundSlam);
 		registry.register("piercing_charge", SkillEffectService::executePiercingCharge);
 		registry.register("spinning_slash", SkillEffectService::executeSpinningSlash);
+		registry.register("raging_cyclone", SkillEffectService::executeRagingCyclone);
 		registry.register("savage_onslaught", SkillEffectService::executeSavageOnslaught);
+		registry.register("massacre", SkillEffectService::executeMassacre);
 		registry.register("fury_unleashed", SkillEffectService::executeFuryUnleashed);
 		registry.register("grasscutter", SkillEffectService::executeGrasscutter);
 		registry.register("crushing_leap", SkillEffectService::executeCrushingLeap);
@@ -609,9 +691,13 @@ public final class SkillEffectService {
 				return 0.0f;
 			}
 		}
-		if (skills.contains("savage_onslaught")
+		if (hasOnslaughtLineSkill(skills)
 				&& EFFECTS.isActive(player.getUUID(), EFX_SAVAGE_ONSLAUGHT, player.level().getGameTime())) {
 			mult *= 1.30f;
+		}
+		if (skills.contains("last_breath") && player.getMaxHealth() > 0.0f
+				&& (player.getHealth() / player.getMaxHealth()) <= 0.15f) {
+			mult *= 0.60f;
 		}
 		// Aura of Righteousness — 15% DR while a paladin is within 17 blocks
 		if (hasPaladinAuraNearby(player)) {
@@ -644,7 +730,11 @@ public final class SkillEffectService {
 	}
 
 	public static void applyReapLifeLifesteal(ServerPlayer attacker, float dealtDamage, boolean applied) {
-		// Reap Life is currently kill-triggered only.
+		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(attacker.getUUID(), "warrior");
+		if (!applied || dealtDamage <= 0.0f) return;
+		if (!skills.contains("massacre")) return;
+		if (!EFFECTS.isActive(attacker.getUUID(), EFX_SAVAGE_ONSLAUGHT, attacker.level().getGameTime())) return;
+		attacker.heal(dealtDamage * 0.10f);
 	}
 
 	/** True if the player has Tough Skin or Iron Skin (cactus immunity). */
@@ -755,6 +845,12 @@ public final class SkillEffectService {
 		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(attacker.getUUID(), "warrior");
 		float mult = 1.0f;
 		long now = attacker.level().getGameTime();
+		double blessingChance = 0.0;
+		double blessingCritDamage = 0.0;
+		if (EFFECTS.isActive(attacker.getUUID(), EFX_FURY_NOW_BLESSING, now)) {
+			blessingChance = furyBlessingCritChanceBonus.getOrDefault(attacker.getUUID(), 0.0);
+			blessingCritDamage = furyBlessingCritDamageBonus.getOrDefault(attacker.getUUID(), 0.0);
+		}
 
 		if (skills.contains("the_first_blow_decides_it") && isFirstStrike(attacker, target, now)) {
 			mult *= 3.00f;
@@ -799,12 +895,22 @@ public final class SkillEffectService {
 			critTriggered = true;
 		}
 
-		if (!critTriggered && skills.contains("battle_fury")) {
+		if (!critTriggered && hasFuryEngine(skills)) {
 			float fury = furyPoints.getOrDefault(attacker.getUUID(), 0.0f);
-			float chance = Math.min(0.30f, fury * 0.003f);
+			float chance = (float) Math.min(1.0, Math.min(0.30f, fury * 0.003f) + blessingChance);
 			if (attacker.level().random.nextFloat() < chance) {
 				mult *= 1.50f;
+				critTriggered = true;
 			}
+		}
+
+		if (!critTriggered && blessingChance > 0.0 && attacker.level().random.nextDouble() < blessingChance) {
+			mult *= 1.50f;
+			critTriggered = true;
+		}
+
+		if (critTriggered && blessingCritDamage > 0.0) {
+			mult *= (float) (1.0 + blessingCritDamage);
 		}
 
 		if (skills.contains("killing_blow") && target.getMaxHealth() > 0.0f
@@ -820,9 +926,10 @@ public final class SkillEffectService {
 			mult *= measuredStrikeMultiplier(target, source, preArmorAmount, 0.20f, 0.0f);
 		}
 
-		if (skills.contains("savage_onslaught")
+		if (hasOnslaughtLineSkill(skills)
 				&& EFFECTS.isActive(attacker.getUUID(), EFX_SAVAGE_ONSLAUGHT, attacker.level().getGameTime())) {
-			mult *= measuredStrikeMultiplier(target, source, preArmorAmount, 0.15f, 0.15f);
+			float bypass = skills.contains("massacre") ? 0.25f : 0.15f;
+			mult *= measuredStrikeMultiplier(target, source, preArmorAmount, bypass, bypass);
 		}
 
 		return mult;
@@ -1420,16 +1527,71 @@ public final class SkillEffectService {
 
 	private static void addBattleFuryStack(ServerPlayer player) {
 		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
-		if (!skills.contains("battle_fury")) return;
-		float current = furyPoints.getOrDefault(player.getUUID(), 0.0f);
-		furyPoints.put(player.getUUID(), Math.min(100.0f, current + 5.0f));
+		if (!hasFuryEngine(skills)) return;
+		float gain = 5.0f;
+		if (skills.contains("rage_engine") && player.getMaxHealth() > 0.0f
+				&& (player.getHealth() / player.getMaxHealth()) < 0.50f) {
+			gain *= 1.5f;
+		}
+		addFury(player, gain, skills);
 	}
 
 	public static int getFuryPoints(UUID playerId) {
 		return Math.round(furyPoints.getOrDefault(playerId, 0.0f));
 	}
 
+	public static boolean isOverclockActive(ServerPlayer player) {
+		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
+		if (!skills.contains("overclock")) return false;
+		float fury = furyPoints.getOrDefault(player.getUUID(), 0.0f);
+		if (fury >= 100.0f) return true;
+		Long until = overclockSustainUntil.get(player.getUUID());
+		return until != null && player.level().getGameTime() <= until;
+	}
+
+	private static void addFury(ServerPlayer player, float amount, Set<String> skills) {
+		if (amount <= 0.0f || !hasFuryEngine(skills)) return;
+		float cap = maxFury(skills);
+		float current = furyPoints.getOrDefault(player.getUUID(), 0.0f);
+		furyPoints.put(player.getUUID(), Math.min(cap, current + amount));
+	}
+
+	private static float consumeFuryForAbility(ServerPlayer player, Set<String> skills) {
+		float fury = furyPoints.getOrDefault(player.getUUID(), 0.0f);
+		if (fury <= 0.0f) return 0.0f;
+		float consumed = skills.contains("greater_battle_fury") ? Math.min(100.0f, fury) : fury;
+		furyPoints.put(player.getUUID(), Math.max(0.0f, fury - consumed));
+		if (skills.contains("overclock") && fury >= 100.0f) {
+			overclockSustainUntil.put(player.getUUID(), player.level().getGameTime() + OVERCLOCK_SUSTAIN_TICKS);
+		}
+		return consumed;
+	}
+
+	private static float maxFury(Set<String> skills) {
+		float max = skills.contains("greater_battle_fury") ? 150.0f : 100.0f;
+		if (skills.contains("rage_reserves")) {
+			max += 100.0f;
+		}
+		return max;
+	}
+
+	private static boolean hasFuryEngine(Set<String> skills) {
+		return skills.contains("battle_fury")
+			|| skills.contains("rage_engine")
+			|| skills.contains("overclock")
+			|| skills.contains("greater_battle_fury")
+			|| skills.contains("endless_rage")
+			|| skills.contains("pain_fuels_me")
+			|| skills.contains("rage_reserves")
+			|| skills.contains("fury_now_blessing");
+	}
+
+	private static boolean hasOnslaughtLineSkill(Set<String> skills) {
+		return skills.contains("savage_onslaught") || skills.contains("massacre");
+	}
+
 	public static void executeFuryUnleashed(ServerPlayer player) {
+		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
 		long now = player.level().getGameTime();
 		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "fury_unleashed", now, FURY_UNLEASHED_COOLDOWN_TICKS);
 		if (remaining > 0L) {
@@ -1449,15 +1611,15 @@ public final class SkillEffectService {
 			return;
 		}
 
-		furyPoints.put(player.getUUID(), 0.0f);
+		float furyConsumed = consumeFuryForAbility(player, skills);
 		COOLDOWNS.start(player.getUUID(), "fury_unleashed", now);
 		EFFECTS.start(player.getUUID(), EFX_FURY_UNLEASHED, now, FURY_UNLEASHED_DURATION_TICKS);
 
-		double bonus = fury * 0.01;
+		double bonus = furyConsumed * 0.01;
 		ClassSystemBootstrap.statEngine().setBuffAmount(player.getUUID(), "fury_unleashed_buff", bonus);
 		ClassSystemBootstrap.statEngine().activateSource(player.getUUID(), "fury_unleashed_buff");
 
-		int furyInt = Math.round(fury);
+		int furyInt = Math.round(furyConsumed);
 		player.sendSystemMessage(Component.literal(
 			"\u00a7c[Wanderers Haven]\u00a7r Fury Unleashed! Consumed " + furyInt + " Battle Fury for +"
 				+ furyInt + "% damage and +" + furyInt + "% size for 1 minute. (15 min cooldown)"));
@@ -1499,6 +1661,42 @@ public final class SkillEffectService {
 				+ " taunted, slowed, and weakened for 8 seconds. (45 sec cooldown)"));
 	}
 
+	public static void executeTerrorizingHowl(ServerPlayer player) {
+		long now = player.level().getGameTime();
+		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "terrorizing_howl", now, MOCKING_SHOUT_COOLDOWN_TICKS);
+		if (remaining > 0L) {
+			player.sendSystemMessage(Component.literal(
+				"\u00a77[Wanderers Haven]\u00a7r Terrorizing Howl is on cooldown (" + (remaining / 20) + "s remaining)."));
+			return;
+		}
+		COOLDOWNS.start(player.getUUID(), "terrorizing_howl", now);
+		long fearEndsAt = now + TERRORIZING_HOWL_FEAR_TICKS;
+		List<LivingEntity> nearby = nearbyEnemies(player, 8.0);
+		if (nearby.isEmpty()) {
+			player.sendSystemMessage(Component.literal(
+				"\u00a77[Wanderers Haven]\u00a7r Terrorizing Howl! No enemies within range."));
+			return;
+		}
+		for (LivingEntity enemy : nearby) {
+			ATTRIBUTE_DEBUFFS.apply(
+				enemy,
+				Attributes.MOVEMENT_SPEED,
+				TERRORIZING_HOWL_FEAR_SLOW_MOD,
+				-0.60,
+				AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				fearEndsAt
+			);
+			if (enemy instanceof Mob mob) {
+				mob.setTarget(null);
+			}
+			fearedEntities.put(enemy.getUUID(), new FearState(player.getUUID(), fearEndsAt));
+		}
+		int count = nearby.size();
+		player.sendSystemMessage(Component.literal(
+			"\u00a7c[Wanderers Haven]\u00a7r Terrorizing Howl! " + count + " enem" + (count == 1 ? "y" : "ies")
+				+ " feared for 3 seconds, then taunted and debuffed for 8 seconds. (45 sec cooldown)"));
+	}
+
 	public static void executeSpinningSlash(ServerPlayer player) {
 		long now = player.level().getGameTime();
 		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "spinning_slash", now, SPINNING_SLASH_COOLDOWN_TICKS);
@@ -1531,6 +1729,42 @@ public final class SkillEffectService {
 			+ " (20 sec cooldown)"));
 	}
 
+	public static void executeRagingCyclone(ServerPlayer player) {
+		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
+		long now = player.level().getGameTime();
+		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "raging_cyclone", now, SPINNING_SLASH_COOLDOWN_TICKS);
+		if (remaining > 0L) {
+			player.sendSystemMessage(Component.literal(
+				"\u00a77[Wanderers Haven]\u00a7r Raging Cyclone is on cooldown (" + (remaining / 20) + "s remaining)."));
+			return;
+		}
+		COOLDOWNS.start(player.getUUID(), "raging_cyclone", now);
+		Vec3 look = player.getLookAngle().normalize();
+		Vec3 startPos = player.position();
+		Vec3 endPos = startPos.add(look.scale(13.0));
+		AABB dashBox = pathBox(startPos, endPos, 4.0);
+		List<LivingEntity> inPath = player.level().getEntitiesOfClass(
+			LivingEntity.class,
+			dashBox,
+			e -> e != player && (e instanceof Enemy || e instanceof Player)
+		);
+		float damage = (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE) * 2.5f;
+		int hit = 0;
+		for (LivingEntity target : inPath) {
+			target.hurt(player.damageSources().playerAttack(player), damage);
+			hit++;
+		}
+		if (hit > 0) {
+			addFury(player, hit * 5.0f, skills);
+		}
+		player.setDeltaMovement(look.scale(3.2));
+		player.hurtMarked = true;
+		player.sendSystemMessage(Component.literal(
+			"\u00a7c[Wanderers Haven]\u00a7r Raging Cyclone!"
+			+ (hit > 0 ? " Hit " + hit + " enem" + (hit == 1 ? "y" : "ies") + " and gained " + (hit * 5) + " Fury." : "")
+			+ " (20 sec cooldown)"));
+	}
+
 	public static void executeSavageOnslaught(ServerPlayer player) {
 		long now = player.level().getGameTime();
 		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "savage_onslaught", now, SAVAGE_ONSLAUGHT_COOLDOWN_TICKS);
@@ -1548,7 +1782,25 @@ public final class SkillEffectService {
 				+ "but take 30% more damage for 10 seconds. (30 sec cooldown)"));
 	}
 
+	public static void executeMassacre(ServerPlayer player) {
+		long now = player.level().getGameTime();
+		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "massacre", now, SAVAGE_ONSLAUGHT_COOLDOWN_TICKS);
+		if (remaining > 0L) {
+			player.sendSystemMessage(Component.literal(
+				"\u00a77[Wanderers Haven]\u00a7r Massacre is on cooldown (" + (remaining / 20) + "s remaining)."));
+			return;
+		}
+		if (EFFECTS.isActive(player.getUUID(), EFX_SAVAGE_ONSLAUGHT, now)) return;
+		COOLDOWNS.start(player.getUUID(), "massacre", now);
+		EFFECTS.start(player.getUUID(), EFX_SAVAGE_ONSLAUGHT, now, SAVAGE_ONSLAUGHT_DURATION_TICKS);
+		ClassSystemBootstrap.statEngine().activateSource(player.getUUID(), "savage_onslaught_buff");
+		player.sendSystemMessage(Component.literal(
+			"\u00a7c[Wanderers Haven]\u00a7r Massacre! +30% damage, +20% attack speed, 25% armor/DR bypass, "
+				+ "10% lifesteal, but take 30% more damage for 10 seconds. (30 sec cooldown)"));
+	}
+
 	public static void executeFuryBecomesFlesh(ServerPlayer player) {
+		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
 		long now = player.level().getGameTime();
 		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "fury_becomes_flesh", now, FURY_BECOMES_FLESH_COOLDOWN_TICKS);
 		if (remaining > 0L) {
@@ -1568,8 +1820,7 @@ public final class SkillEffectService {
 			target.hurtMarked = true;
 			hit++;
 		}
-		float furyConsumed = furyPoints.getOrDefault(player.getUUID(), 0.0f);
-		furyPoints.put(player.getUUID(), 0.0f);
+		float furyConsumed = consumeFuryForAbility(player, skills);
 		if (furyConsumed > 0.0f) {
 			float heal = player.getMaxHealth() * 0.005f * furyConsumed;
 			player.heal(heal);
@@ -1579,6 +1830,49 @@ public final class SkillEffectService {
 			"\u00a7c[Wanderers Haven]\u00a7r Fury Becomes Flesh!"
 				+ (hit > 0 ? " Hit " + hit + " enem" + (hit == 1 ? "y" : "ies") + "." : "")
 				+ (furyInt > 0 ? " Consumed " + furyInt + " Fury for healing." : " No Fury to consume.")
+				+ " (15 sec cooldown)"));
+	}
+
+	public static void executeFuryNowBlessing(ServerPlayer player) {
+		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
+		long now = player.level().getGameTime();
+		long remaining = COOLDOWNS.remainingTicks(player.getUUID(), "fury_now_blessing", now, FURY_BECOMES_FLESH_COOLDOWN_TICKS);
+		if (remaining > 0L) {
+			player.sendSystemMessage(Component.literal(
+				"\u00a77[Wanderers Haven]\u00a7r Fury, Now Blessing is on cooldown (" + (remaining / 20) + "s remaining)."));
+			return;
+		}
+		COOLDOWNS.start(player.getUUID(), "fury_now_blessing", now);
+		List<LivingEntity> targets = nearbyEnemies(player, 2.0);
+		float damage = (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE);
+		int hit = 0;
+		for (LivingEntity target : targets) {
+			target.hurt(player.damageSources().playerAttack(player), damage);
+			Vec3 away = target.position().subtract(player.position());
+			Vec3 dir = away.lengthSqr() > 0.0001 ? away.normalize() : new Vec3(0.0, 0.0, 1.0);
+			target.setDeltaMovement(dir.x * 1.0, Math.max(target.getDeltaMovement().y, 0.28), dir.z * 1.0);
+			target.hurtMarked = true;
+			hit++;
+		}
+		float furyConsumed = consumeFuryForAbility(player, skills);
+		if (furyConsumed > 0.0f) {
+			float heal = player.getMaxHealth() * 0.0075f * furyConsumed;
+			player.heal(heal);
+			furyBlessingCritChanceBonus.put(player.getUUID(), furyConsumed * 0.0025);
+			furyBlessingCritDamageBonus.put(player.getUUID(), furyConsumed * 0.005);
+			EFFECTS.start(player.getUUID(), EFX_FURY_NOW_BLESSING, now, FURY_NOW_BLESSING_DURATION_TICKS);
+		} else {
+			furyBlessingCritChanceBonus.remove(player.getUUID());
+			furyBlessingCritDamageBonus.remove(player.getUUID());
+			EFFECTS.clear(player.getUUID(), EFX_FURY_NOW_BLESSING);
+		}
+		int furyInt = Math.round(furyConsumed);
+		player.sendSystemMessage(Component.literal(
+			"\u00a7c[Wanderers Haven]\u00a7r Fury, Now Blessing!"
+				+ (hit > 0 ? " Hit " + hit + " enem" + (hit == 1 ? "y" : "ies") + "." : "")
+				+ (furyInt > 0
+					? " Consumed " + furyInt + " Fury for stronger healing and empowered critical strikes for 10 seconds."
+					: " No Fury to consume.")
 				+ " (15 sec cooldown)"));
 	}
 
@@ -2018,6 +2312,30 @@ public final class SkillEffectService {
 			Long until = inCombatUntil.get(entry.getKey());
 			return until == null || now > until;
 		});
+		overclockSustainUntil.entrySet().removeIf(entry -> now > entry.getValue());
+	}
+
+	private static void handleFuryDecay(ServerPlayer player) {
+		Set<String> skills = ClassSystemBootstrap.skillEngine().ownedSkillIds(player.getUUID(), "warrior");
+		if (!hasFuryEngine(skills)) return;
+		if (skills.contains("endless_rage")) return;
+		float fury = furyPoints.getOrDefault(player.getUUID(), 0.0f);
+		if (fury <= 0.0f) {
+			furyDecayLastTickAt.remove(player.getUUID());
+			return;
+		}
+		long now = player.level().getGameTime();
+		if (isInCombat(player)) {
+			furyDecayLastTickAt.put(player.getUUID(), now);
+			return;
+		}
+		long last = furyDecayLastTickAt.getOrDefault(player.getUUID(), now);
+		long elapsed = now - last;
+		if (elapsed < FURY_DECAY_INTERVAL_TICKS) return;
+		int steps = (int) (elapsed / FURY_DECAY_INTERVAL_TICKS);
+		float reduced = Math.max(0.0f, fury - steps);
+		furyPoints.put(player.getUUID(), reduced);
+		furyDecayLastTickAt.put(player.getUUID(), last + (steps * FURY_DECAY_INTERVAL_TICKS));
 	}
 
 	private static void handleDangersense(ServerPlayer player) {
@@ -2030,7 +2348,6 @@ public final class SkillEffectService {
 		long last = dangersenseLastWarnAt.getOrDefault(player.getUUID(), Long.MIN_VALUE / 2);
 		if (now - last < DANGERSENSE_WARN_INTERVAL_TICKS) return;
 		dangersenseLastWarnAt.put(player.getUUID(), now);
-		player.displayClientMessage(Component.literal("\u00a7c[Danger]\u00a7r Hostile nearby!"), true);
 	}
 
 	private static void handleLightfootedJump(ServerPlayer player) {
@@ -2342,9 +2659,14 @@ public final class SkillEffectService {
 
 		if (skills.contains("skin_of_adamantium") && isMagicDamage(source)) mult *= 0.60f;
 
-		if (skills.contains("savage_onslaught")
+		if (hasOnslaughtLineSkill(skills)
 				&& EFFECTS.isActive(player.getUUID(), EFX_SAVAGE_ONSLAUGHT, player.level().getGameTime())) {
 			mult *= 1.30f;
+		}
+
+		if (skills.contains("last_breath") && player.getMaxHealth() > 0.0f
+				&& (player.getHealth() / player.getMaxHealth()) <= 0.15f) {
+			mult *= 0.60f;
 		}
 
 		if (skills.contains("stand_your_ground")) {

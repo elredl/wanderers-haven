@@ -18,8 +18,8 @@ import java.util.stream.Collectors;
  *
  * Roll rules:
  *  - Every multiple of 5 is a guaranteed roll from the current window's PW.
- *  - Level 35+ always rolls (100% chance).
- *  - Levels 1–34 have a linearly-scaling chance: ~20% at level 1, ~100% at level 34.
+ *  - Level 65+ always rolls (100% chance).
+ *  - Levels 1–64 have a linearly-scaling chance: ~20% at level 1, 90% at level 64.
  *
  * Power-level selection (non-guaranteed rolls):
  *  - Window PW (W) = level / 10 + 1, capped at 10.
@@ -155,7 +155,13 @@ public final class SkillRollEngine {
 			return Set.of();
 		}
 		Set<String> owned = byClass.get(classId);
-		return owned == null ? Set.of() : owned;
+		if (owned == null || owned.isEmpty()) {
+			return Set.of();
+		}
+		Set<String> effective = ConcurrentHashMap.newKeySet();
+		effective.addAll(owned);
+		pruneSupersededOwnedSkills(classId, effective);
+		return Set.copyOf(effective);
 	}
 
 	/** All registered skills across all classes, sorted by class then power level. */
@@ -176,10 +182,15 @@ public final class SkillRollEngine {
 			for (List<SkillDefinition> skills : byPw.values()) {
 				for (SkillDefinition skill : skills) {
 					if (skill.id().equals(skillId)) {
-						playerSkills
+						Set<String> ownedSet = playerSkills
 							.computeIfAbsent(playerId, k -> new ConcurrentHashMap<>())
 							.computeIfAbsent(skill.classId(), k -> ConcurrentHashMap.newKeySet())
-							.add(skill.id());
+						;
+						if (skill.supersedesId() != null) {
+							ownedSet.remove(skill.supersedesId());
+						}
+						ownedSet.add(skill.id());
+						pruneSupersededOwnedSkills(skill.classId(), ownedSet);
 						return Optional.of(skill);
 					}
 				}
@@ -213,17 +224,17 @@ public final class SkillRollEngine {
 
 	/**
 	 * Whether a skill roll happens at all for this level.
-	 * Multiples of 5 and levels 35+ are always true.
-	 * Levels 1–34 scale linearly from ~20% to ~97%.
+	 * Multiples of 5 and levels 65+ are always true.
+	 * Levels 1–64 scale linearly from ~20% to 90%.
 	 */
 	private boolean shouldRoll(int level) {
 		if (level % 5 == 0) {
 			return true;
 		}
-		if (level >= 35) {
+		if (level >= 65) {
 			return true;
 		}
-		double chance = 0.20 + (level - 1) * (0.80 / 34.0);
+		double chance = 0.20 + (level - 1) * (0.70 / 63.0);
 		return random.nextDouble() < chance;
 	}
 
@@ -342,5 +353,25 @@ public final class SkillRollEngine {
 		m.put(k1, v1);
 		m.put(k2, v2);
 		return m;
+	}
+
+	private void pruneSupersededOwnedSkills(String classId, Set<String> ownedIds) {
+		if (ownedIds.isEmpty()) return;
+		Map<String, SkillDefinition> defsById = registry.getOrDefault(classId, Map.of()).values().stream()
+			.flatMap(List::stream)
+			.collect(Collectors.toMap(SkillDefinition::id, s -> s, (a, b) -> a));
+		if (defsById.isEmpty()) return;
+
+		Set<String> snapshot = Set.copyOf(ownedIds);
+		for (String id : snapshot) {
+			SkillDefinition def = defsById.get(id);
+			if (def == null) continue;
+			String superseded = def.supersedesId();
+			while (superseded != null) {
+				ownedIds.remove(superseded);
+				SkillDefinition previous = defsById.get(superseded);
+				superseded = previous == null ? null : previous.supersedesId();
+			}
+		}
 	}
 }

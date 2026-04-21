@@ -16,10 +16,15 @@ import java.util.List;
  *
  * Upgrade chains of note:
  *   Battle Cry (Weak) -> Mocking Shout
+ *   Mocking Shout -> Terrorizing Howl
  *   Piercing Charge -> Spinning Slash
+ *   Spinning Slash -> Raging Cyclone
  *   Berserker Rage -> Enhanced Berserker Rage
  *   Heavy Strikes -> Savage Onslaught
+ *   Savage Onslaught -> Massacre
  *   Bludgeon -> Fury Becomes Flesh
+ *   Fury Becomes Flesh -> Fury, Now Blessing
+ *   Battle Fury -> Rage Engine / Overclock / Greater Battle Fury
  */
 public final class BerserkerSkills {
 
@@ -92,6 +97,94 @@ public final class BerserkerSkills {
 		"bludgeon"
 	);
 
+	private static final SkillDefinition RAGE_ENGINE = upgrade(
+		CLASS,
+		"rage_engine", 5,
+		"Rage Engine",
+		"Builds on Battle Fury. While under 50% health, your Fury generation is increased by 50%.",
+		"battle_fury"
+	);
+
+	private static final SkillDefinition OVERCLOCK = upgrade(
+		CLASS,
+		"overclock", 5,
+		"Overclock",
+		"Builds on Battle Fury. Gain +30% attack speed while at 100 Fury, and keep it for 5 seconds after consuming Fury.",
+		"battle_fury"
+	);
+
+	private static final SkillDefinition LAST_BREATH = passive(
+		CLASS,
+		"last_breath", 5,
+		"Last Breath",
+		"While below 15% health, gain 40% damage reduction."
+	);
+
+	private static final SkillDefinition TERRORIZING_HOWL = activeUpgrade(
+		CLASS,
+		"terrorizing_howl", 5,
+		"Terrorizing Howl",
+		"All nearby enemies are feared for 3 seconds (slowed by 60% and fleeing from you), then become taunted, "
+			+ "deal 30% less damage, take 20% more damage, and remain slowed by 20%. (45 sec cooldown)",
+		"mocking_shout"
+	);
+
+	private static final SkillDefinition RAGING_CYCLONE = activeUpgrade(
+		CLASS,
+		"raging_cyclone", 5,
+		"Raging Cyclone",
+		"Dash 13 blocks in a violent arc, dealing 250% weapon damage to enemies in your path and gaining 5 Fury per enemy hit. "
+			+ "(20 sec cooldown)",
+		"spinning_slash"
+	);
+
+	private static final SkillDefinition GREATER_BATTLE_FURY = upgrade(
+		CLASS,
+		"greater_battle_fury", 5,
+		"Greater Battle Fury",
+		"Builds on Battle Fury. Increases Fury storage to 150. Fury-consuming abilities use up to 100 Fury per activation.",
+		"battle_fury"
+	);
+
+	private static final SkillDefinition ENDLESS_RAGE = passive(
+		CLASS,
+		"endless_rage", 6,
+		"Endless Rage",
+		"Your Fury no longer decays while out of combat."
+	);
+
+	private static final SkillDefinition MASSACRE = activeUpgrade(
+		CLASS,
+		"massacre", 6,
+		"Massacre",
+		"Upgrade of Savage Onslaught. For 10 seconds: +30% damage, +20% attack speed, 25% armor/DR bypass, "
+			+ "10% lifesteal, but you take 30% more damage. (30 sec cooldown)",
+		"savage_onslaught"
+	);
+
+	private static final SkillDefinition PAIN_FUELS_ME = passive(
+		CLASS,
+		"pain_fuels_me", 6,
+		"Pain Fuels Me",
+		"Gain Fury equal to 15% of damage received."
+	);
+
+	private static final SkillDefinition RAGE_RESERVES = passive(
+		CLASS,
+		"rage_reserves", 6,
+		"Rage Reserves",
+		"Gain +100 maximum Fury."
+	);
+
+	private static final SkillDefinition FURY_NOW_BLESSING = activeUpgrade(
+		CLASS,
+		"fury_now_blessing", 6,
+		"Fury, Now Blessing",
+		"Upgrade of Fury Becomes Flesh. Heal 50% more from consumed Fury. Also gain +0.25% critical hit chance and "
+			+ "+0.5% critical hit damage per Fury consumed for 10 seconds. (15 sec cooldown)",
+		"fury_becomes_flesh"
+	);
+
 	private BerserkerSkills() {}
 
 	// ── API ───────────────────────────────────────────────────────────────────
@@ -109,7 +202,18 @@ public final class BerserkerSkills {
 				SPINNING_SLASH,
 				ENHANCED_BERSERKER_RAGE,
 				SAVAGE_ONSLAUGHT,
-				FURY_BECOMES_FLESH
+				FURY_BECOMES_FLESH,
+				RAGE_ENGINE,
+				OVERCLOCK,
+				LAST_BREATH,
+				TERRORIZING_HOWL,
+				RAGING_CYCLONE,
+				GREATER_BATTLE_FURY,
+				ENDLESS_RAGE,
+				MASSACRE,
+				PAIN_FUELS_ME,
+				RAGE_RESERVES,
+				FURY_NOW_BLESSING
 			)
 		);
 	}
@@ -126,7 +230,18 @@ public final class BerserkerSkills {
 			SPINNING_SLASH,
 			ENHANCED_BERSERKER_RAGE,
 			SAVAGE_ONSLAUGHT,
-			FURY_BECOMES_FLESH
+			FURY_BECOMES_FLESH,
+			RAGE_ENGINE,
+			OVERCLOCK,
+			LAST_BREATH,
+			TERRORIZING_HOWL,
+			RAGING_CYCLONE,
+			GREATER_BATTLE_FURY,
+			ENDLESS_RAGE,
+			MASSACRE,
+			PAIN_FUELS_ME,
+			RAGE_RESERVES,
+			FURY_NOW_BLESSING
 		);
 	}
 }

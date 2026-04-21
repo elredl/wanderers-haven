@@ -239,6 +239,12 @@ public final class SkillStatTable {
 				SkillStatTable::enhancedBerserkerRageSpeedAmount,
 				p -> owns(p, "enhanced_berserker_rage")));
 
+		engine.register("overclock",
+			StatContribution.dynamic(Attributes.ATTACK_SPEED, id("overclock_speed"),
+				AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL,
+				p -> SkillEffectService.isOverclockActive(p) ? 0.30 : 0.0,
+				p -> owns(p, "overclock")));
+
 		// ── Conditional (weapon-gated, rechecked each tick) ───────────────────
 
 		// Swift Blade (Duelist) — +20% attack speed while holding a light blade
