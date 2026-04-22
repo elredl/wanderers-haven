@@ -23,6 +23,6 @@
     }
   },
   "textures": {
-    "layer0": "wanderers_haven:item/diamond_greathammer"
+    "layer0": "wanderers_haven:item/stone_greathammer"
   }
 }

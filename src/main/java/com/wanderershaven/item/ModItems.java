@@ -31,6 +31,7 @@ public final class ModItems {
 	public static final Item NETHERITE_GREATSWORD = registerWeapon("netherite_greatsword", ToolMaterial.NETHERITE, 9.0f, 1.4f);
 
 	public static final Item IRON_GREATHAMMER = registerWeapon("iron_greathammer", ToolMaterial.IRON, 11.0f, 1.2f);
+	public static final Item STONE_GREATHAMMER = registerWeapon("stone_greathammer", ToolMaterial.STONE, 11.0f, 1.2f);
 	public static final Item GOLD_GREATHAMMER = registerWeapon("gold_greathammer", ToolMaterial.GOLD, 11.0f, 1.2f);
 	public static final Item DIAMOND_GREATHAMMER = registerWeapon("diamond_greathammer", ToolMaterial.DIAMOND, 11.0f, 1.2f);
 	public static final Item NETHERITE_GREATHAMMER = registerWeapon("netherite_greathammer", ToolMaterial.NETHERITE, 11.0f, 1.2f);
@@ -44,6 +45,7 @@ public final class ModItems {
 	public static final Item GOLD_MACE = registerWeapon("gold_mace", ToolMaterial.GOLD, 7.0f, 1.5f);
 	public static final Item DIAMOND_MACE = registerWeapon("diamond_mace", ToolMaterial.DIAMOND, 7.0f, 1.5f);
 	public static final Item NETHERITE_MACE = registerWeapon("netherite_mace", ToolMaterial.NETHERITE, 7.0f, 1.5f);
+	
 	public static final Item QUIVER = registerQuiver("quiver");
 	public static final Item TWIN_CROSSBOW = registerTwinCrossbow("twin_crossbow");
 	public static final Item SHORTBOW_BUCKLER = registerShortbowBuckler("shortbow_buckler");
@@ -65,6 +67,7 @@ public final class ModItems {
 			entries.accept(DIAMOND_GREATSWORD);
 			entries.accept(NETHERITE_GREATSWORD);
 			entries.accept(IRON_GREATHAMMER);
+			entries.accept(STONE_GREATHAMMER);
 			entries.accept(GOLD_GREATHAMMER);
 			entries.accept(DIAMOND_GREATHAMMER);
 			entries.accept(NETHERITE_GREATHAMMER);

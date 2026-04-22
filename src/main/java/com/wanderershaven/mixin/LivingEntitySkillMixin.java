@@ -140,9 +140,12 @@ public abstract class LivingEntitySkillMixin {
 
 	private static void applyShortbowMeleeRecoil(ServerPlayer player) {
 		if (player.isShiftKeyDown()) return;
+		if (player.getAttackStrengthScale(0.5f) < 0.95f) return;
 		Vec3 look = player.getLookAngle();
-		double strength = 0.45;
-		Vec3 recoil = new Vec3(-look.x * strength, 0.18, -look.z * strength);
+		if (look.lengthSqr() < 1.0E-6) {
+			return;
+		}
+		Vec3 recoil = look.normalize().scale(-0.9);
 		player.setDeltaMovement(player.getDeltaMovement().add(recoil));
 		player.hurtMarked = true;
 	}

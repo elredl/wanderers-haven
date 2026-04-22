@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "wanderers_haven:item/shortbow_buckler_icon"
+  }
+}

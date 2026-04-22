@@ -14,6 +14,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(LivingEntity.class)
 public abstract class TwinCrossbowHandsMixin {
+	private static ItemStack shortbowVisualBow;
+
+	private static ItemStack shortbowVisualBow() {
+		if (shortbowVisualBow == null) {
+			shortbowVisualBow = Items.BOW.getDefaultInstance();
+		}
+		return shortbowVisualBow;
+	}
 
 	@Inject(method = "getOffhandItem", at = @At("HEAD"), cancellable = true)
 	private void wh_overrideOffhandVisual(CallbackInfoReturnable<ItemStack> cir) {
@@ -27,7 +35,7 @@ public abstract class TwinCrossbowHandsMixin {
 			return;
 		}
 		if (mainHand.getItem() == ModItems.SHORTBOW_BUCKLER) {
-			cir.setReturnValue(new ItemStack(Items.BOW));
+			cir.setReturnValue(shortbowVisualBow());
 		}
 	}
 
@@ -60,6 +68,28 @@ public abstract class TwinCrossbowHandsMixin {
 			cir.setReturnValue(mainHand);
 		} else if (hand == InteractionHand.MAIN_HAND && offHand.getItem() == ModItems.TWIN_CROSSBOW) {
 			cir.setReturnValue(offHand);
+		} else if (hand == InteractionHand.OFF_HAND && mainHand.getItem() == ModItems.SHORTBOW_BUCKLER) {
+			cir.setReturnValue(shortbowVisualBow());
+		}
+	}
+
+	@Inject(method = "getUsedItemHand", at = @At("HEAD"), cancellable = true)
+	private void wh_forceOffhandUseForShortbowBuckler(CallbackInfoReturnable<InteractionHand> cir) {
+		if (!((Object) this instanceof Player player) || !player.level().isClientSide()) {
+			return;
+		}
+		if (player.isUsingItem() && player.getMainHandItem().getItem() == ModItems.SHORTBOW_BUCKLER) {
+			cir.setReturnValue(InteractionHand.OFF_HAND);
+		}
+	}
+
+	@Inject(method = "getUseItem", at = @At("HEAD"), cancellable = true)
+	private void wh_forceBowUseItemForShortbowBuckler(CallbackInfoReturnable<ItemStack> cir) {
+		if (!((Object) this instanceof Player player) || !player.level().isClientSide()) {
+			return;
+		}
+		if (player.isUsingItem() && player.getMainHandItem().getItem() == ModItems.SHORTBOW_BUCKLER) {
+			cir.setReturnValue(shortbowVisualBow());
 		}
 	}
 }

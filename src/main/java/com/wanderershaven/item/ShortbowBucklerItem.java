@@ -115,6 +115,9 @@ public final class ShortbowBucklerItem extends AxeItem {
 
 	public static void applyMeleeHitEffects(LivingEntity target, LivingEntity attacker) {
 		target.hurt(attacker instanceof Player player ? attacker.damageSources().playerAttack(player) : attacker.damageSources().mobAttack(attacker), BONUS_MELEE_DAMAGE);
+		if (attacker instanceof Player player && player.getAttackStrengthScale(0.5f) < 0.95f) {
+			return;
+		}
 		target.knockback(KNOCKBACK_STRENGTH, attacker.getX() - target.getX(), attacker.getZ() - target.getZ());
 	}
 }

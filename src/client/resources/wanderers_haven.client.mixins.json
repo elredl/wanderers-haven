@@ -4,7 +4,8 @@
 	"compatibilityLevel": "JAVA_21",
 	"client": [
 		"WanderersHavenClientMixin",
-		"ShortbowBucklerHandRendererMixin"
+		"ShortbowBucklerHandRendererMixin",
+		"PairedWeaponFirstPersonMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
