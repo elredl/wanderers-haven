@@ -107,7 +107,12 @@ public final class ModItems {
 	private static Item registerShortbowBuckler(String id) {
 		Identifier itemId = Identifier.fromNamespaceAndPath(WanderersHavenMod.MOD_ID, id);
 		ResourceKey<Item> key = ResourceKey.create(Registries.ITEM, itemId);
-		Item item = new ShortbowBucklerItem(new Item.Properties().stacksTo(1).durability(430).setId(key));
+		Item item = new ShortbowBucklerItem(
+			ToolMaterial.IRON,
+			3.0f,
+			toAttackSpeedModifier(0.6f),
+			new Item.Properties().stacksTo(1).durability(430).setId(key)
+		);
 		return Registry.register(BuiltInRegistries.ITEM, itemId, item);
 	}
 

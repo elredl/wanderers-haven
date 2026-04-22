@@ -13,25 +13,27 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
+import net.minecraft.world.item.AxeItem;
 import net.minecraft.world.item.ArrowItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemUseAnimation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.ToolMaterial;
 import net.minecraft.world.level.Level;
 
-public final class ShortbowBucklerItem extends Item {
+public final class ShortbowBucklerItem extends AxeItem {
 
 	private static final float MAX_POWER = 0.82f;
 	private static final float CHARGE_TICKS = 12.0f;
 	private static final float PROJECTILE_SPEED_MULT = 2.4f;
 	private static final float PROJECTILE_INACCURACY = 1.2f;
 	private static final double DAMAGE_MULT = 0.8d;
-	private static final float BONUS_MELEE_DAMAGE = 2.0f;
+	private static final float BONUS_MELEE_DAMAGE = 0.0f;
 	private static final double KNOCKBACK_STRENGTH = 0.8d;
 
-	public ShortbowBucklerItem(Properties properties) {
-		super(properties);
+	public ShortbowBucklerItem(ToolMaterial material, float attackDamage, float attackSpeed, Properties properties) {
+		super(material, attackDamage, attackSpeed, properties);
 	}
 
 	@Override

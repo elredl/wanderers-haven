@@ -35,7 +35,6 @@
 		"fabric-api": "*"
 	},
 	"suggests": {
-		"bettercombat": ">=3.0.1",
-		"simplyswords": "*"
+		"bettercombat": ">=3.0.1"
 	}
 }
