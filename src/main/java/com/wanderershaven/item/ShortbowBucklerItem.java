@@ -107,18 +107,12 @@ public final class ShortbowBucklerItem extends Item {
 
 	@Override
 	public void hurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker) {
+		applyMeleeHitEffects(target, attacker);
+		stack.hurtAndBreak(1, attacker, EquipmentSlot.MAINHAND);
+	}
+
+	public static void applyMeleeHitEffects(LivingEntity target, LivingEntity attacker) {
 		target.hurt(attacker instanceof Player player ? attacker.damageSources().playerAttack(player) : attacker.damageSources().mobAttack(attacker), BONUS_MELEE_DAMAGE);
 		target.knockback(KNOCKBACK_STRENGTH, attacker.getX() - target.getX(), attacker.getZ() - target.getZ());
-		if (attacker instanceof Player player && !player.isShiftKeyDown()) {
-			double dx = target.getX() - player.getX();
-			double dz = target.getZ() - player.getZ();
-			double length = Math.sqrt(dx * dx + dz * dz);
-			if (length > 1.0E-5d) {
-				double nx = dx / length;
-				double nz = dz / length;
-				player.push(-nx * KNOCKBACK_STRENGTH, 0.1d, -nz * KNOCKBACK_STRENGTH);
-			}
-		}
-		stack.hurtAndBreak(1, attacker, EquipmentSlot.MAINHAND);
 	}
 }

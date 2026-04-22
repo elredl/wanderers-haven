@@ -2,6 +2,7 @@ package com.wanderershaven.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.wanderershaven.item.ModItems;
 import com.wanderershaven.skill.SkillEffectService;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -14,6 +15,7 @@ import java.util.UUID;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
@@ -100,6 +102,10 @@ public abstract class LivingEntitySkillMixin {
 				if (applied && finalAmount > 0.0f) {
 					SkillEffectService.recordSuccessfulHit(attackingPlayer);
 				}
+				if (applied && source.is(DamageTypes.PLAYER_ATTACK)
+						&& attackingPlayer.getMainHandItem().getItem() == ModItems.SHORTBOW_BUCKLER) {
+					applyShortbowMeleeRecoil(attackingPlayer);
+				}
 				SkillEffectService.applyReapLifeLifesteal(attackingPlayer, finalAmount, applied);
 			}
 			return applied;
@@ -122,10 +128,23 @@ public abstract class LivingEntitySkillMixin {
 			if (applied && amount > 0.0f) {
 				SkillEffectService.recordSuccessfulHit(attacker);
 			}
+			if (applied && source.is(DamageTypes.PLAYER_ATTACK)
+					&& attacker.getMainHandItem().getItem() == ModItems.SHORTBOW_BUCKLER) {
+				applyShortbowMeleeRecoil(attacker);
+			}
 			SkillEffectService.applyReapLifeLifesteal(attacker, amount, applied);
 			return applied;
 		}
 		return original.call(level, source, amount);
+	}
+
+	private static void applyShortbowMeleeRecoil(ServerPlayer player) {
+		if (player.isShiftKeyDown()) return;
+		Vec3 look = player.getLookAngle();
+		double strength = 0.45;
+		Vec3 recoil = new Vec3(-look.x * strength, 0.18, -look.z * strength);
+		player.setDeltaMovement(player.getDeltaMovement().add(recoil));
+		player.hurtMarked = true;
 	}
 
 	@ModifyVariable(method = "heal", at = @At("HEAD"), argsOnly = true, ordinal = 0)

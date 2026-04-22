@@ -3,7 +3,8 @@
 	"package": "com.wanderershaven.mixin.client",
 	"compatibilityLevel": "JAVA_21",
 	"client": [
-		"WanderersHavenClientMixin"
+		"WanderersHavenClientMixin",
+		"ShortbowBucklerHandRendererMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
